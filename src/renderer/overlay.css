@@ -122,6 +122,13 @@ html, body {
 .ic { width: 1.15em; height: 1.15em; flex: none; color: var(--ink); filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.7)); }
 .ic.slashed { color: var(--danger); }
 .vrow .ic { margin-left: 0.1em; }
+.live {
+  padding: 0.05em 0.42em 0.08em;
+  border-radius: 0.35em;
+  background: #ed4245; color: #fff;
+  font-size: 0.68em; font-weight: 800; letter-spacing: 0.04em;
+  text-shadow: none;
+}
 
 /* 내 상태 + 설정 버튼 막대 */
 .bar {

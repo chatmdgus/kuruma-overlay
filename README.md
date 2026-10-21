@@ -15,6 +15,21 @@ npm.cmd start      # 실제 서버에 접속. 서버 주소·토큰·채널은 �
 
 PowerShell 실행 정책 때문에 `npm` 대신 `npm.cmd`를 씀.
 
+### 설치 파일로 쓰기
+
+```powershell
+npm.cmd run dist
+```
+
+`dist\Kuruma Overlay Setup <버전>.exe`를 실행하면 설치되고 바탕화면·시작 메뉴에 아이콘이 생김. 설정은 개발 실행과 같은 폴더를 써서 그대로 이어짐.
+코드 서명이 없어서 처음 실행할 때 SmartScreen 경고가 뜨면 추가 정보 → 실행.
+
+### 처음 설정
+
+- 서버 연결(토큰, 서버 ID, 채팅 채널 ID)과 모니터는 처음 한 번만 입력
+- 서버 주인은 SSH 터널을 켜면 앱이 켜질 때 터널을 같이 엶 (키 파일 지정)
+- 평소 설정은 트레이 아이콘이나 음성 오버레이의 톱니바퀴
+
 - 입력 모드: `Ctrl+Shift+D` → 입력 후 Enter 전송, Esc 취소
 - 설정: 트레이 아이콘 또는 음성 오버레이의 톱니바퀴 → 연결, 모니터, 배치, 글자 크기, 배경 진하기 등
 - 설정 파일: `%APPDATA%/kuruma-overlay/config.json`
@@ -31,6 +46,7 @@ src/
     mock.js      개발용 가짜 데이터 (--mock 일 때만)
     settings.js  설정 창, 배치 미리보기
     tray.js      트레이 메뉴
+    tunnel.js    SSH 터널 (서버 주인용)
   preload.js
   settings-preload.js
   renderer/      chat / media / voice 오버레이, settings 설정 창, common.js 공용(아바타·아이콘·연결 상태)
@@ -46,4 +62,5 @@ docs/DESIGN.md
 - [x] 설정 창과 배치 편집기 (트레이 아이콘 → 설정, 첫 실행 때 자동으로 열림)
 - [x] 트레이 아이콘: 오버레이 숨기기·설정·종료
 - [ ] OAuth2 로그인
-- [ ] 설치 파일 배포, 자동 업데이트
+- [x] 설치 파일 (npm.cmd run dist), Windows 시작 시 자동 실행, 앱에서 SSH 터널
+- [ ] 자동 업데이트, Cloudflare Tunnel로 친구들 접속

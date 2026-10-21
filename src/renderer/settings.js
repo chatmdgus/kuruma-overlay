@@ -1,31 +1,155 @@
 const $ = (id) => document.getElementById(id);
-const NAMES = { chat: '채팅', media: '미디어', voice: '음성' };
+const NAMES = { chat: '채팅', media: '사진·영상', voice: '음성' };
 const SNAP = 0.015;
 const MIN = 0.04;
 
-let state = null;      // 편집 중인 설정 (monitors, overlays, appearance, hotkeys, 연결)
+let state = null;      // 편집 중인 설정 전체
 let defaults = null;
 let displays = [];
 let resolved = {};
 let view = null;       // 무대 좌표 변환 정보
+let lastConn = null;
+let lastTunnel = null;
 
 const clone = (o) => JSON.parse(JSON.stringify(o));
 const roleId = (role) => state.monitors[role] ?? resolved[role];
 const displayById = (id) => displays.find((d) => d.id === String(id)) || displays[0];
 
-// ---------- 모니터 선택 ----------
-function fillSelects() {
+// ---------- 버튼 묶음 (슬라이더·드롭다운 대신) ----------
+// options: [{ label, value }]. 숫자 값은 저장된 값과 가장 가까운 버튼을 켬
+function bindSeg(id, options, get, set, { live = true } = {}) {
+  const box = $(id);
+  box.setAttribute('role', 'radiogroup');
+  const pick = () => {
+    const cur = get();
+    if (typeof cur === 'number') {
+      return options.reduce((best, o, i) => (Math.abs(o.value - cur) < Math.abs(options[best].value - cur) ? i : best), 0);
+    }
+    return Math.max(0, options.findIndex((o) => o.value === cur));
+  };
+  const buttons = options.map((o) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.setAttribute('role', 'radio');
+    b.textContent = o.label;
+    b.onclick = () => { set(o.value); paint(); if (live) preview(); };
+    return b;
+  });
+  const paint = () => { const i = pick(); buttons.forEach((b, j) => b.setAttribute('aria-checked', String(i === j))); };
+  box.replaceChildren(...buttons);
+  paint();
+  return paint;
+}
+
+const SIZE3 = (vals) => [{ label: '작게', value: vals[0] }, { label: '보통', value: vals[1] }, { label: '크게', value: vals[2] }];
+const ONOFF = [{ label: '켜기', value: true }, { label: '끄기', value: false }];
+
+// ---------- 연결 상태 표시 ----------
+const CONN_TEXT = { setup: '연결 안 됨', connecting: '연결하는 중', online: '연결됨', offline: '연결 끊김', error: '토큰이 맞지 않음' };
+const TUNNEL_TEXT = { off: '꺼짐', starting: '여는 중', open: '열림', failed: '실패', stopped: '꺼짐' };
+
+function paintPill(el, state, text) {
+  el.dataset.state = state;
+  el.lastChild.textContent = text;
+}
+
+function showConnection(c) {
+  lastConn = c;
+  const text = c?.mock ? '가짜 데이터 모드' : (c?.reason === 'bad_url' ? '서버 주소가 올바르지 않음' : CONN_TEXT[c?.state] || '');
+  for (const id of ['conn', 'conn2']) paintPill($(id), c?.state || 'setup', text);
+}
+
+function showTunnel(t) {
+  lastTunnel = t;
+  const map = { open: 'online', starting: 'connecting', failed: 'error' };
+  const text = `SSH ${TUNNEL_TEXT[t?.state] || ''}${t?.detail ? ` · ${t.detail}` : ''}`;
+  for (const id of ['tunnel', 'tunnel2']) paintPill($(id), map[t?.state] || 'setup', text);
+  $('tunnel2').hidden = !t || t.state === 'off';
+}
+
+// ---------- 처음 설정 ----------
+const splitIds = (v) => v.split(/[,\s]+/).map((x) => x.trim()).filter(Boolean);
+
+function fillSetup() {
+  $('server-url').value = state.serverUrl || '';
+  $('token').value = state.sessionToken || '';
+  $('guild-id').value = state.subscribe?.guildId || '';
+  $('channel-ids').value = (state.subscribe?.channelIds || []).join(', ');
+  $('token-show').onclick = () => {
+    const t = $('token');
+    t.type = t.type === 'password' ? 'text' : 'password';
+    $('token-show').textContent = t.type === 'password' ? '보기' : '숨기기';
+  };
+
+  const s = state.ssh;
+  $('ssh-host').value = s.host || '';
+  $('ssh-user').value = s.user || 'ubuntu';
+  $('ssh-key').value = s.keyPath || '';
+  $('ssh-port').value = s.remotePort || 8790;
+  $('ssh-pick').onclick = async () => { const p = await window.settingsApi.pickKey(); if (p) $('ssh-key').value = p; };
+  const toggleFields = () => { $('ssh-fields').hidden = !state.ssh.enabled; };
+  bindSeg('ssh-on', [{ label: '사용', value: true }, { label: '사용 안 함', value: false }], () => state.ssh.enabled, (v) => { state.ssh.enabled = v; toggleFields(); }, { live: false });
+  toggleFields();
+
   for (const role of ['main', 'sub']) {
-    const sel = $(`mon-${role}`);
-    sel.replaceChildren(...displays.map((d) => {
-      const o = document.createElement('option');
-      o.value = d.id;
-      o.textContent = d.label;
-      return o;
-    }));
-    sel.value = String(roleId(role));
-    sel.onchange = () => { state.monitors[role] = sel.value; render(); preview(); };
+    bindSeg(`mon-${role}`, displays.map((d, i) => ({ label: `${i + 1}번 ${d.bounds.width}×${d.bounds.height}${d.primary ? ' (주)' : ''}`, value: d.id })),
+      () => String(roleId(role)), (v) => { state.monitors[role] = v; render(); }, { live: true });
   }
+}
+
+function readSetup() {
+  const port = Math.round(Number($('ssh-port').value)) || 8790;
+  state.serverUrl = $('server-url').value.trim();
+  state.sessionToken = $('token').value.trim();
+  state.subscribe = { guildId: $('guild-id').value.trim(), channelIds: splitIds($('channel-ids').value), voiceChannelIds: [] };
+  state.ssh = { ...state.ssh, host: $('ssh-host').value.trim(), user: $('ssh-user').value.trim() || 'ubuntu', keyPath: $('ssh-key').value.trim(), localPort: port, remotePort: port };
+}
+
+function setupProblem() {
+  if (!state.sessionToken) return '토큰을 입력하세요';
+  if (!/^\d{5,25}$/.test(state.subscribe.guildId)) return '서버 ID는 숫자여야 함';
+  if (!state.subscribe.channelIds.length || state.subscribe.channelIds.some((id) => !/^\d{5,25}$/.test(id))) return '채팅 채널 ID는 숫자여야 함';
+  if (state.ssh.enabled) {
+    if (!state.ssh.host) return 'SSH 서버 IP를 입력하세요';
+    if (!state.ssh.keyPath) return 'SSH 키 파일을 지정하세요';
+  } else if (!/^wss?:\/\//.test(state.serverUrl)) {
+    return '서버 주소는 ws:// 또는 wss:// 로 시작해야 함';
+  }
+  return '';
+}
+
+const isConfigured = (cfg) => !!(cfg.sessionToken && (cfg.serverUrl || (cfg.ssh?.enabled && cfg.ssh.host && cfg.ssh.keyPath)) && cfg.monitors?.main);
+
+// ---------- 평소 설정 ----------
+function fillMain() {
+  const o = state.overlays;
+
+  const chips = Object.keys(NAMES).map((name) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = `chip ${name}`;
+    b.textContent = NAMES[name];
+    const paint = () => b.setAttribute('aria-pressed', String(o[name].enabled));
+    b.onclick = () => { o[name].enabled = !o[name].enabled; paint(); render(); preview(); };
+    paint();
+    return b;
+  });
+  $('enabled').replaceChildren(...chips);
+
+  bindSeg('chat-size', SIZE3([13, 15, 18]), () => o.chat.fontSize, (v) => { o.chat.fontSize = v; });
+  bindSeg('chat-fade', [5, 10, 15, 30].map((v) => ({ label: `${v}초`, value: v })).concat({ label: '안 사라짐', value: 0 }), () => o.chat.fadeSec, (v) => { o.chat.fadeSec = v; });
+  bindSeg('chat-lines', [5, 8, 12].map((v) => ({ label: `${v}줄`, value: v })), () => o.chat.maxLines, (v) => { o.chat.maxLines = v; });
+
+  bindSeg('media-max', [1, 2, 3].map((v) => ({ label: `${v}장`, value: v })), () => o.media.maxItems, (v) => { o.media.maxItems = v; });
+  bindSeg('media-fade', [5, 8, 10].map((v) => ({ label: `${v}초`, value: v })), () => o.media.fadeSec, (v) => { o.media.fadeSec = v; });
+
+  bindSeg('voice-size', SIZE3([1, 1.25, 1.6]), () => o.voice.scale, (v) => { o.voice.scale = v; });
+  bindSeg('voice-gap', [{ label: '좁게', value: 2 }, { label: '보통', value: 6 }, { label: '넓게', value: 12 }], () => o.voice.gap, (v) => { o.voice.gap = v; });
+  bindSeg('voice-controls', [{ label: '표시', value: true }, { label: '숨김', value: false }], () => o.voice.showControls !== false, (v) => { o.voice.showControls = v; });
+
+  bindSeg('bg-opacity', [{ label: '없음', value: 0 }, { label: '연하게', value: 0.3 }, { label: '보통', value: 0.5 }, { label: '진하게', value: 0.72 }],
+    () => state.appearance.bgOpacity, (v) => { state.appearance.bgOpacity = v; });
+  bindSeg('at-login', ONOFF, () => !!state.launch.atLogin, (v) => { state.launch.atLogin = v; }, { live: false });
 }
 
 // ---------- 배치 무대 ----------
@@ -44,7 +168,6 @@ function computeView() {
   view = { scale, minX, minY, ox, oy };
 }
 
-// 화면 좌표(px) ↔ 무대 좌표
 const toStage = (b) => ({
   left: view.ox + (b.x - view.minX) * view.scale,
   top: view.oy + (b.y - view.minY) * view.scale,
@@ -68,8 +191,9 @@ function overlayStageRect(name) {
 }
 
 function render() {
-  computeView();
   const stage = $('stage');
+  if (!stage.clientWidth) return;   // 처음 설정 화면이 떠 있을 때
+  computeView();
   const nodes = [];
 
   for (const d of displays) {
@@ -80,9 +204,7 @@ function render() {
     Object.assign(el.style, { left: `${r.left}px`, top: `${r.top}px`, width: `${r.width}px`, height: `${r.height}px` });
     const tag = document.createElement('div');
     tag.className = 'tag';
-    const b = document.createElement('b');
-    b.textContent = roles.length ? roles.join('·') : '사용 안 함';
-    tag.append(b, document.createTextNode(`  ${d.label}`));
+    tag.textContent = roles.length ? roles.join('·') : '사용 안 함';
     el.append(tag);
     nodes.push(el);
   }
@@ -91,7 +213,6 @@ function render() {
     const r = overlayStageRect(name);
     const el = document.createElement('div');
     el.className = `box ${name}` + (state.overlays[name].enabled ? '' : ' off');
-    el.dataset.name = name;
     Object.assign(el.style, { left: `${r.left}px`, top: `${r.top}px`, width: `${r.width}px`, height: `${r.height}px` });
     el.textContent = NAMES[name];
     const handle = document.createElement('div');
@@ -174,73 +295,13 @@ function startDrag(e, name, mode) {
   el.addEventListener('pointercancel', onUp);
 }
 
-// ---------- 표시 옵션 ----------
-// 슬라이더: 값이 바뀌면 state에 넣고 바로 미리보기
-function bindRange(id, get, set, fmt) {
-  const el = $(id);
-  const out = $(`${id}-out`);
-  el.value = get();
-  out.textContent = fmt(Number(el.value));
-  el.oninput = () => { set(Number(el.value)); out.textContent = fmt(Number(el.value)); preview(); };
+// ---------- 화면 전환, 미리보기, 저장 ----------
+function showView(name) {
+  $('setup').hidden = name !== 'setup';
+  $('main').hidden = name !== 'main';
+  if (name === 'main') requestAnimationFrame(render);
 }
 
-function fillOptions() {
-  const o = state.overlays;
-  for (const name of Object.keys(NAMES)) {
-    const cb = $(`en-${name}`);
-    cb.checked = o[name].enabled;
-    cb.onchange = () => { o[name].enabled = cb.checked; render(); preview(); };
-  }
-
-  $('chat-fade').value = String(o.chat.fadeSec);
-  $('chat-fade').onchange = (e) => { o.chat.fadeSec = Number(e.target.value); preview(); };
-  bindRange('chat-lines', () => o.chat.maxLines, (v) => { o.chat.maxLines = v; }, (v) => `${v}줄`);
-  bindRange('chat-font', () => o.chat.fontSize, (v) => { o.chat.fontSize = v; }, (v) => `${v}px`);
-  $('hotkey').value = state.hotkeys.input.replace('CommandOrControl', 'Ctrl');
-
-  bindRange('media-max', () => o.media.maxItems, (v) => { o.media.maxItems = v; }, (v) => `${v}장`);
-  bindRange('media-fade', () => o.media.fadeSec, (v) => { o.media.fadeSec = v; }, (v) => `${v}초`);
-
-  bindRange('voice-scale', () => o.voice.scale, (v) => { o.voice.scale = v; }, (v) => `${Math.round(v * 100)}%`);
-  bindRange('voice-gap', () => o.voice.gap, (v) => { o.voice.gap = v; }, (v) => `${v}px`);
-  $('voice-controls').checked = o.voice.showControls !== false;
-  $('voice-controls').onchange = (e) => { o.voice.showControls = e.target.checked; preview(); };
-
-  bindRange('bg-opacity', () => state.appearance.bgOpacity, (v) => { state.appearance.bgOpacity = v; }, (v) => `${Math.round(v * 100)}%`);
-}
-
-// ---------- 연결 ----------
-const CONN_TEXT = { setup: '연결 안 됨', connecting: '연결하는 중', online: '연결됨', offline: '연결 끊김', error: '토큰이 맞지 않음' };
-
-function showConnection(c) {
-  const el = $('conn');
-  el.dataset.state = c?.state || 'setup';
-  el.lastChild.textContent = c?.mock ? '가짜 데이터 모드' : (c?.reason === 'bad_url' ? '주소가 올바르지 않음' : (CONN_TEXT[c?.state] || ''));
-}
-
-const splitIds = (v) => v.split(/[,\s]+/).map((x) => x.trim()).filter(Boolean);
-
-function fillConnection(cfg) {
-  $('server-url').value = cfg.serverUrl || '';
-  $('token').value = cfg.sessionToken || '';
-  $('guild-id').value = cfg.subscribe?.guildId || '';
-  $('channel-ids').value = (cfg.subscribe?.channelIds || []).join(', ');
-  $('token-show').onclick = () => {
-    const t = $('token');
-    t.type = t.type === 'password' ? 'text' : 'password';
-    $('token-show').textContent = t.type === 'password' ? '보기' : '숨기기';
-  };
-}
-
-function readConnection() {
-  return {
-    serverUrl: $('server-url').value.trim(),
-    sessionToken: $('token').value.trim(),
-    subscribe: { guildId: $('guild-id').value.trim(), channelIds: splitIds($('channel-ids').value), voiceChannelIds: [] },
-  };
-}
-
-// ---------- 미리보기와 저장 ----------
 let previewTimer = null;
 function preview() {
   clearTimeout(previewTimer);
@@ -248,6 +309,37 @@ function preview() {
     window.settingsApi.preview({ monitors: state.monitors, overlays: state.overlays, appearance: state.appearance });
   }, 40);
 }
+
+const savable = () => ({
+  serverUrl: state.serverUrl,
+  sessionToken: state.sessionToken,
+  subscribe: state.subscribe,
+  ssh: state.ssh,
+  launch: state.launch,
+  monitors: state.monitors,
+  overlays: state.overlays,
+  appearance: state.appearance,
+});
+
+function flash(id, text) {
+  $(id).textContent = text;
+  clearTimeout(flash[id]);
+  flash[id] = setTimeout(() => { $(id).textContent = id === 'main-msg' ? '채팅 입력은 Ctrl+Shift+D' : ''; }, 2500);
+}
+
+$('setup-done').onclick = async () => {
+  readSetup();
+  const problem = setupProblem();
+  if (problem) { $('setup-msg').textContent = problem; $('setup-msg').className = 'msg bad'; return; }
+  state.monitors.main = state.monitors.main ?? resolved.main;
+  state.monitors.sub = state.monitors.sub ?? resolved.sub;
+  await window.settingsApi.save(savable());
+  $('setup-msg').textContent = '';
+  showView('main');
+  flash('main-msg', '저장함');
+};
+$('setup-back').onclick = () => showView('main');
+$('open-setup').onclick = () => { $('setup-back').hidden = false; showView('setup'); };
 
 $('reset').onclick = () => {
   for (const name of Object.keys(NAMES)) {
@@ -259,9 +351,8 @@ $('reset').onclick = () => {
 };
 
 $('save').onclick = async () => {
-  await window.settingsApi.save({ monitors: state.monitors, overlays: state.overlays, appearance: state.appearance, ...readConnection() });
-  $('status').textContent = '저장함';
-  setTimeout(() => { $('status').textContent = ''; }, 2000);
+  await window.settingsApi.save(savable());
+  flash('main-msg', '저장함');
 };
 
 $('cancel').onclick = () => window.settingsApi.close();
@@ -270,17 +361,17 @@ window.addEventListener('resize', () => state && render());
 
 (async () => {
   const res = await window.settingsApi.get();
-  state = clone({ monitors: res.config.monitors, overlays: res.config.overlays, appearance: res.config.appearance, hotkeys: res.config.hotkeys });
+  state = clone(res.config);
   defaults = res.defaults;
   displays = res.displays;
   resolved = res.resolved;
-  // 처음엔 실제로 쓰이는 모니터를 명시해 둠
-  state.monitors.main = state.monitors.main ?? resolved.main;
-  state.monitors.sub = state.monitors.sub ?? resolved.sub;
-  fillConnection(res.config);
+
   showConnection(res.mock ? { state: 'online', mock: true } : res.connection);
+  showTunnel(res.tunnel);
   window.settingsApi.onConnection(showConnection);
-  fillSelects();
-  fillOptions();
-  render();
+  window.settingsApi.onTunnel(showTunnel);
+
+  fillSetup();
+  fillMain();
+  showView(res.mock || isConfigured(res.config) ? 'main' : 'setup');
 })();

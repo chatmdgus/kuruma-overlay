@@ -1,17 +1,24 @@
 const { app, screen, globalShortcut, ipcMain, BrowserWindow } = require('electron');
 const path = require('path');
+
+// 개발 실행(npm start)과 설치본이 같은 설정 폴더를 쓰게 고정
+app.setPath('userData', path.join(app.getPath('appData'), 'kuruma-overlay'));
 const config = require('./config');
 const { makeOverlay, placeOverlay } = require('./overlay');
 const { startRelay } = require('./relay');
 const { startMock } = require('./mock');
 const { setupSettings, openSettings, notifySettings } = require('./settings');
 const { createTray } = require('./tray');
+const { startTunnel } = require('./tunnel');
 
 const MOCK = process.argv.includes('--mock');
 const wins = {};
 let feed = null;
 let feedKey = '';
 let connection = { state: 'setup' };
+let tunnel = null;
+let tunnelKey = '';
+let tunnelState = { state: 'off' };
 let inputMode = false;
 let userHidden = false;
 let registeredHotkey = null;
@@ -56,9 +63,31 @@ function setConnection(c) {
   notifySettings('connection', c);
 }
 
+// SSH 터널: 설정이 바뀌었을 때만 다시 열기
+function syncTunnel(cfg = config.get()) {
+  const s = cfg.ssh;
+  const on = !MOCK && s.enabled && s.host && s.user && s.keyPath;
+  const key = on ? JSON.stringify(s) : '';
+  if (key === tunnelKey) return;
+  tunnel && tunnel.stop();
+  tunnel = null;
+  tunnelKey = key;
+  if (!on) { tunnelState = { state: 'off' }; notifySettings('tunnel', tunnelState); return; }
+  tunnel = startTunnel(s, (st) => { tunnelState = st; notifySettings('tunnel', st); });
+}
+
+// SSH 터널을 쓰고 서버 주소가 비어 있으면 터널 주소로
+const serverUrlOf = (cfg) => cfg.serverUrl || (cfg.ssh.enabled ? `ws://127.0.0.1:${cfg.ssh.localPort}` : '');
+
+function syncLaunch(cfg = config.get()) {
+  // 개발 실행일 때는 electron.exe에 앱 폴더를 넘겨야 함
+  app.setLoginItemSettings({ openAtLogin: !!cfg.launch.atLogin, path: process.execPath, args: app.isPackaged ? [] : [app.getAppPath()] });
+}
+
 // 접속 정보가 바뀌었을 때만 다시 연결
 function startFeed(cfg = config.get()) {
-  const key = MOCK ? 'mock' : JSON.stringify([cfg.serverUrl, cfg.sessionToken, cfg.subscribe]);
+  const url = serverUrlOf(cfg);
+  const key = MOCK ? 'mock' : JSON.stringify([url, cfg.sessionToken, cfg.subscribe]);
   // 같은 정보라도 토큰 오류로 멈춘 상태면 저장할 때 다시 시도
   if (feed && key === feedKey && connection.state !== 'error') return;
   feed && feed.stop();
@@ -66,7 +95,7 @@ function startFeed(cfg = config.get()) {
   feedKey = key;
   for (const w of Object.values(wins)) w.webContents.send('reset');
   if (MOCK) feed = startMock(emit);
-  else if (cfg.serverUrl && cfg.sessionToken) feed = startRelay(cfg, emit);
+  else if (url && cfg.sessionToken) feed = startRelay({ ...cfg, serverUrl: url }, emit);
   else setConnection({ state: 'setup' });
 }
 
@@ -74,6 +103,8 @@ function applyConfig(cfg) {
   layoutAll(cfg);
   sendSettings(cfg);
   registerHotkey(cfg);
+  syncTunnel(cfg);
+  syncLaunch(cfg);
   startFeed(cfg);
 }
 
@@ -125,6 +156,7 @@ const settingsDeps = {
   config,
   resolveDisplay: (role) => resolveDisplay(role),
   getConnection: () => connection,
+  getTunnel: () => tunnelState,
   isMock: () => MOCK,
   applyConfig,
   previewConfig: (partial) => {
@@ -142,10 +174,12 @@ app.whenReady().then(() => {
 
   Promise.all(Object.values(wins).map((w) => new Promise((r) => w.webContents.once('did-finish-load', r)))).then(() => {
     sendSettings();
+    syncTunnel();
+    if (config.get().launch.atLogin) syncLaunch();   // 설치 위치가 바뀌었을 수 있어서 다시 등록
     startFeed();
     const cfg = config.get();
     // 첫 실행이거나 접속 정보가 없으면 설정 창부터
-    if (!cfg.monitors.main || (!MOCK && !(cfg.serverUrl && cfg.sessionToken))) openSettings(settingsDeps);
+    if (!cfg.monitors.main || (!MOCK && !(serverUrlOf(cfg) && cfg.sessionToken))) openSettings(settingsDeps);
   });
 
   setupSettings(settingsDeps);
@@ -186,6 +220,7 @@ app.on('second-instance', () => openSettings(settingsDeps));
 app.on('will-quit', () => {
   globalShortcut.unregisterAll();
   feed && feed.stop();
+  tunnel && tunnel.stop();
 });
 
 // 설정 창을 닫아도 오버레이와 트레이는 계속 실행

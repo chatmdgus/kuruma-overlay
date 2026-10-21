@@ -34,7 +34,7 @@ function startMock(emit) {
       channelId: 'mock-voice',
       members: [{ id: '0', name: 'チャ', selfMute: false, selfDeaf: false }, ...people].map((p) => ({
         id: p.id, name: p.name, avatar: null, color: p.color || null,
-        selfMute: Math.random() < 0.2, selfDeaf: Math.random() < 0.1, serverMute: false, streaming: false,
+        selfMute: Math.random() < 0.2, selfDeaf: Math.random() < 0.1, serverMute: false, streaming: p.id === '1', video: p.id === '3',
       })),
     });
   }, 6000);

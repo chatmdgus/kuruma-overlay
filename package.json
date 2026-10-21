@@ -7,7 +7,7 @@
   "scripts": {
     "start": "electron .",
     "mock": "electron . --mock",
-    "dist": "electron-builder --win"
+    "dist": "electron-builder --win nsis"
   },
   "devDependencies": {
     "electron": "^40.0.0",
@@ -16,7 +16,23 @@
   "build": {
     "appId": "dev.kuruma.overlay",
     "productName": "Kuruma Overlay",
-    "files": ["src/**/*", "package.json"],
-    "win": { "target": "nsis" }
+    "files": [
+      "src/**/*",
+      "package.json"
+    ],
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "target": "nsis",
+      "signAndEditExecutable": false
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Kuruma Overlay"
+    }
   }
 }

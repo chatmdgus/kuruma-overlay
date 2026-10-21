@@ -8,91 +8,109 @@
   <link rel="stylesheet" href="settings.css">
 </head>
 <body>
-  <main>
-    <section>
-      <header><h2>연결</h2><span class="conn" id="conn"><i></i><span></span></span></header>
-      <div class="rows">
-        <label class="row"><span class="lb">서버 주소</span>
-          <input type="text" id="server-url" placeholder="ws://127.0.0.1:8790" spellcheck="false"></label>
-        <label class="row"><span class="lb">토큰<small>서버 주인에게 받은 값</small></span>
-          <span class="pair"><input type="password" id="token" spellcheck="false" autocomplete="off"><button type="button" id="token-show" class="ghost sm">보기</button></span></label>
-        <label class="row"><span class="lb">서버 ID</span>
-          <input type="text" id="guild-id" inputmode="numeric" spellcheck="false"></label>
-        <label class="row"><span class="lb">채팅 채널 ID<small>여러 개면 쉼표로 구분, 보내기는 첫 번째 채널</small></span>
-          <input type="text" id="channel-ids" spellcheck="false"></label>
-        <p class="note" id="voice-note">음성은 내가 들어가 있는 채널을 자동으로 따라감.</p>
-      </div>
-    </section>
+  <!-- 처음 설정: 한 번만 입력하는 것들 -->
+  <div class="view" id="setup" hidden>
+    <main>
+      <h1>처음 설정</h1>
+      <p class="lead">한 번만 입력하면 됨. 나중에 바꾸려면 설정 창 위쪽의 연결 설정을 누르면 됨.</p>
 
-    <section>
-      <header><h2>모니터</h2></header>
-      <div class="rows">
-        <label class="row"><span class="lb">메인 모니터<small>게임 화면</small></span><select id="mon-main"></select></label>
-        <label class="row"><span class="lb">서브 모니터<small>유튜브 화면</small></span><select id="mon-sub"></select></label>
-      </div>
-    </section>
+      <section>
+        <header><h2>서버 연결</h2><span class="pill" id="conn"><i></i><span></span></span></header>
+        <div class="rows">
+          <label class="row"><span class="lb">토큰<small>서버 주인에게 받은 값</small></span>
+            <span class="pair"><input type="password" id="token" spellcheck="false" autocomplete="off"><button type="button" id="token-show" class="ghost sm">보기</button></span></label>
+          <label class="row"><span class="lb">서버 ID</span><input type="text" id="guild-id" inputmode="numeric" spellcheck="false"></label>
+          <label class="row"><span class="lb">채팅 채널 ID<small>여러 개면 쉼표로 구분</small></span><input type="text" id="channel-ids" spellcheck="false"></label>
+          <label class="row"><span class="lb">서버 주소<small>SSH 터널을 쓰면 비워둠</small></span><input type="text" id="server-url" placeholder="wss://…" spellcheck="false"></label>
+        </div>
+      </section>
 
-    <section>
-      <header><h2>배치</h2><button id="reset" type="button" class="ghost sm">기본 배치로</button></header>
-      <p class="note">상자를 끌어서 옮기고 오른쪽 아래 모서리로 크기를 조절함. 다른 모니터로 끌어 놓으면 그 모니터로 옮겨짐. 실제 화면에도 바로 보임.</p>
-      <div id="stage" class="stage"></div>
-      <div class="toggles">
-        <label><input type="checkbox" id="en-chat"> 채팅</label>
-        <label><input type="checkbox" id="en-media"> 사진·영상</label>
-        <label><input type="checkbox" id="en-voice"> 음성</label>
-      </div>
-    </section>
+      <section>
+        <header><h2>SSH 터널</h2><span class="pill" id="tunnel"><i></i><span></span></span></header>
+        <div class="rows">
+          <div class="row"><span class="lb">앱에서 SSH 터널 열기<small>서버 주인만 해당</small></span><span class="seg" id="ssh-on"></span></div>
+          <div id="ssh-fields">
+            <label class="row"><span class="lb">서버 IP</span><input type="text" id="ssh-host" placeholder="서버 IP 주소" spellcheck="false"></label>
+            <label class="row"><span class="lb">사용자</span><input type="text" id="ssh-user" placeholder="ubuntu" spellcheck="false"></label>
+            <label class="row"><span class="lb">키 파일</span>
+              <span class="pair"><input type="text" id="ssh-key" placeholder="키 파일 위치" spellcheck="false"><button type="button" id="ssh-pick" class="ghost sm">찾기</button></span></label>
+            <label class="row"><span class="lb">포트</span><input type="text" id="ssh-port" inputmode="numeric" placeholder="8790"></label>
+          </div>
+        </div>
+      </section>
 
-    <section>
-      <header><h2>채팅</h2></header>
-      <div class="rows">
-        <label class="row"><span class="lb">사라지는 시간</span>
-          <select id="chat-fade">
-            <option value="5">5초</option><option value="10">10초</option><option value="15">15초</option><option value="30">30초</option><option value="0">사라지지 않음</option>
-          </select></label>
-        <label class="row"><span class="lb">최대 줄 수</span>
-          <span class="range"><input type="range" id="chat-lines" min="3" max="15" step="1"><output id="chat-lines-out"></output></span></label>
-        <label class="row"><span class="lb">글자 크기</span>
-          <span class="range"><input type="range" id="chat-font" min="12" max="24" step="1"><output id="chat-font-out"></output></span></label>
-        <label class="row"><span class="lb">입력 단축키</span><input type="text" id="hotkey" readonly></label>
-      </div>
-    </section>
+      <section>
+        <header><h2>모니터</h2></header>
+        <div class="rows">
+          <div class="row"><span class="lb">메인<small>게임 화면</small></span><span class="seg wrap" id="mon-main"></span></div>
+          <div class="row"><span class="lb">서브<small>유튜브 화면</small></span><span class="seg wrap" id="mon-sub"></span></div>
+        </div>
+      </section>
+    </main>
+    <footer>
+      <span class="msg" id="setup-msg"></span>
+      <button type="button" id="setup-back" class="ghost" hidden>돌아가기</button>
+      <button type="button" id="setup-done" class="primary">완료</button>
+    </footer>
+  </div>
 
-    <section>
-      <header><h2>사진·영상</h2></header>
-      <div class="rows">
-        <label class="row"><span class="lb">한 번에 보일 개수</span>
-          <span class="range"><input type="range" id="media-max" min="1" max="3" step="1"><output id="media-max-out"></output></span></label>
-        <label class="row"><span class="lb">사라지는 시간</span>
-          <span class="range"><input type="range" id="media-fade" min="5" max="10" step="1"><output id="media-fade-out"></output></span></label>
+  <!-- 평소 설정 -->
+  <div class="view" id="main" hidden>
+    <main>
+      <div class="topbar">
+        <span class="pill" id="conn2"><i></i><span></span></span>
+        <span class="pill" id="tunnel2" hidden><i></i><span></span></span>
+        <button type="button" id="open-setup" class="ghost sm">연결 설정</button>
       </div>
-    </section>
 
-    <section>
-      <header><h2>음성</h2></header>
-      <div class="rows">
-        <label class="row"><span class="lb">크기</span>
-          <span class="range"><input type="range" id="voice-scale" min="0.8" max="2" step="0.05"><output id="voice-scale-out"></output></span></label>
-        <label class="row"><span class="lb">줄 간격</span>
-          <span class="range"><input type="range" id="voice-gap" min="0" max="20" step="1"><output id="voice-gap-out"></output></span></label>
-        <label class="row"><span class="lb">내 상태와 설정 버튼 표시</span><input type="checkbox" id="voice-controls" class="switch"></label>
-      </div>
-    </section>
+      <section>
+        <header><h2>배치</h2><button id="reset" type="button" class="ghost sm">기본 배치로</button></header>
+        <p class="note">상자를 끌어서 옮기고, 오른쪽 아래 모서리로 크기를 조절함. 실제 화면에도 바로 보임.</p>
+        <div id="stage" class="stage"></div>
+        <div class="chips" id="enabled" aria-label="표시할 오버레이"></div>
+      </section>
 
-    <section>
-      <header><h2>공통</h2></header>
-      <div class="rows">
-        <label class="row"><span class="lb">말풍선 배경 진하기<small>0%면 글자만 보임</small></span>
-          <span class="range"><input type="range" id="bg-opacity" min="0" max="0.9" step="0.05"><output id="bg-opacity-out"></output></span></label>
-      </div>
-    </section>
-  </main>
+      <section>
+        <header><h2>채팅</h2></header>
+        <div class="rows">
+          <div class="row"><span class="lb">크기</span><span class="seg" id="chat-size"></span></div>
+          <div class="row"><span class="lb">사라지는 시간</span><span class="seg" id="chat-fade"></span></div>
+          <div class="row"><span class="lb">최대 줄 수</span><span class="seg" id="chat-lines"></span></div>
+        </div>
+      </section>
 
-  <footer>
-    <span id="status" class="saved"></span>
-    <button id="cancel" type="button" class="ghost">닫기</button>
-    <button id="save" type="button" class="primary">저장</button>
-  </footer>
+      <section>
+        <header><h2>사진·영상</h2></header>
+        <div class="rows">
+          <div class="row"><span class="lb">한 번에 보일 개수</span><span class="seg" id="media-max"></span></div>
+          <div class="row"><span class="lb">사라지는 시간</span><span class="seg" id="media-fade"></span></div>
+        </div>
+      </section>
+
+      <section>
+        <header><h2>음성</h2></header>
+        <div class="rows">
+          <div class="row"><span class="lb">크기</span><span class="seg" id="voice-size"></span></div>
+          <div class="row"><span class="lb">줄 간격</span><span class="seg" id="voice-gap"></span></div>
+          <div class="row"><span class="lb">내 상태·설정 버튼</span><span class="seg" id="voice-controls"></span></div>
+        </div>
+      </section>
+
+      <section>
+        <header><h2>공통</h2></header>
+        <div class="rows">
+          <div class="row"><span class="lb">말풍선 배경</span><span class="seg" id="bg-opacity"></span></div>
+          <div class="row"><span class="lb">Windows 시작할 때 자동 실행</span><span class="seg" id="at-login"></span></div>
+        </div>
+      </section>
+    </main>
+    <footer>
+      <span class="msg" id="main-msg">채팅 입력은 Ctrl+Shift+D</span>
+      <button id="cancel" type="button" class="ghost">닫기</button>
+      <button id="save" type="button" class="primary">저장</button>
+    </footer>
+  </div>
+
   <script src="settings.js"></script>
 </body>
 </html>

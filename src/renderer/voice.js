@@ -41,6 +41,14 @@ function render(next) {
     if (m.color) name.style.color = m.color;   // 역할 색
 
     row.append(ui.avatar(m), name);
+    if (m.streaming) {
+      const live = document.createElement('span');
+      live.className = 'live';
+      live.textContent = 'LIVE';
+      live.title = '화면 공유 중';
+      row.append(live);
+    }
+    if (m.video) row.append(ui.icon('camera', { label: '카메라 켜짐' }));
     if (deaf) row.append(ui.icon('headphones', { slash: true, label: '스피커 꺼짐' }));
     else if (mute) row.append(ui.icon('mic', { slash: true, label: '마이크 꺼짐' }));
     return row;

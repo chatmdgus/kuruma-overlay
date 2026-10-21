@@ -1,4 +1,4 @@
-const { BrowserWindow, ipcMain, screen } = require('electron');
+const { BrowserWindow, ipcMain, screen, dialog } = require('electron');
 const path = require('path');
 
 let win = null;
@@ -27,6 +27,7 @@ function setupSettings(deps) {
       displays: displaysInfo(),
       resolved: { main: String(deps.resolveDisplay('main').id), sub: String(deps.resolveDisplay('sub').id) },
       connection: deps.getConnection(),
+      tunnel: deps.getTunnel(),
       mock: deps.isMock(),
     };
   });
@@ -43,6 +44,15 @@ function setupSettings(deps) {
   });
 
   ipcMain.handle('settings:close', () => { win && win.close(); });
+
+  ipcMain.handle('settings:pick-key', async () => {
+    const r = await dialog.showOpenDialog(win, {
+      title: 'SSH 키 파일 선택',
+      defaultPath: require('path').join(require('os').homedir(), '.ssh'),
+      properties: ['openFile', 'showHiddenFiles'],
+    });
+    return r.canceled ? null : r.filePaths[0];
+  });
 }
 
 function openSettings(deps) {
