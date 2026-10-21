@@ -25,6 +25,10 @@ let tunnelState = { state: 'off' };
 let inputMode = false;
 let userHidden = false;
 let registeredHotkey = null;
+let quitting = false;
+// 종료 중에는 창이 먼저 없어질 수 있어서 확인하고 보냄
+const post = (w, ...args) => { if (w && !w.isDestroyed()) w.webContents.send(...args); };
+const alive = () => Object.values(wins).filter((w) => !w.isDestroyed());
 
 if (!app.requestSingleInstanceLock()) app.quit();
 
@@ -38,7 +42,9 @@ function resolveDisplay(role, cfg = config.get()) {
 }
 
 function layoutAll(cfg = config.get()) {
+  if (quitting) return;
   for (const [name, win] of Object.entries(wins)) {
+    if (win.isDestroyed()) continue;
     const o = cfg.overlays[name];
     // 음성 오버레이는 쓰지 않음 (디스코드 기본 오버레이 사용)
     if (!o.enabled || userHidden || name === 'voice') { win.hide(); continue; }
@@ -50,9 +56,9 @@ function layoutAll(cfg = config.get()) {
 function sendSettings(cfg = config.get()) {
   const { overlays, appearance } = cfg;
   const bgOpacity = appearance.bgOpacity;
-  wins.chat.webContents.send('settings', { fadeSec: overlays.chat.fadeSec, maxLines: overlays.chat.maxLines, fontSize: overlays.chat.fontSize, bgOpacity });
-  wins.media.webContents.send('settings', { fadeSec: overlays.media.fadeSec, maxItems: overlays.media.maxItems });
-  wins.voice.webContents.send('settings', { scale: overlays.voice.scale, gap: overlays.voice.gap, showControls: overlays.voice.showControls, bgOpacity });
+  post(wins.chat, 'settings', { fadeSec: overlays.chat.fadeSec, maxLines: overlays.chat.maxLines, fontSize: overlays.chat.fontSize, bgOpacity });
+  post(wins.media, 'settings', { fadeSec: overlays.media.fadeSec, maxItems: overlays.media.maxItems });
+  post(wins.voice, 'settings', { scale: overlays.voice.scale, gap: overlays.voice.gap, showControls: overlays.voice.showControls, bgOpacity });
 }
 
 function registerHotkey(cfg = config.get()) {
@@ -63,7 +69,7 @@ function registerHotkey(cfg = config.get()) {
 
 function setConnection(c) {
   connection = c;
-  for (const w of Object.values(wins)) w.webContents.send('connection', c);
+  for (const w of Object.values(wins)) post(w, 'connection', c);
   notifySettings('connection', c);
 }
 
@@ -113,7 +119,7 @@ function startFeed(cfg = config.get()) {
   feed && feed.stop();
   feed = null;
   feedKey = key;
-  for (const w of Object.values(wins)) w.webContents.send('reset');
+  for (const w of Object.values(wins)) post(w, 'reset');
   channelNames.clear();
   if (MOCK) feed = startMock(emit);
   else if (url && token) feed = startRelay({ ...cfg, serverUrl: url, sessionToken: token }, emit);
@@ -130,7 +136,7 @@ function applyConfig(cfg) {
 }
 
 function setEditMode(on) {
-  for (const win of Object.values(wins)) win.webContents.send('edit-mode', on);
+  for (const win of Object.values(wins)) post(win, 'edit-mode', on);
 }
 
 function setInputMode(on) {
@@ -140,27 +146,27 @@ function setInputMode(on) {
   chat.setFocusable(on);
   chat.setIgnoreMouseEvents(!on, { forward: true });
   if (on) chat.focus();
-  chat.webContents.send('input-mode', on);
+  post(chat, 'input-mode', on);
 }
 
 // 입력창에 "어느 채널로 보내는지" 표시. 채널을 따로 정하지 않았으면 볼 수 있는 첫 채팅 채널
 function sendTarget(cfg = config.get()) {
   sendChannelId = MOCK ? 'mock' : (cfg.subscribe.channelIds[0] || [...channelNames.keys()][0] || null);
-  wins.chat.webContents.send('target', channelNames.get(sendChannelId) || null);
+  post(wins.chat, 'target', channelNames.get(sendChannelId) || null);
 }
 
 function emit(type, payload) {
   switch (type) {
     case 'message': {
       const media = payload.media || [];
-      wins.chat.webContents.send('message', {
+      post(wins.chat, 'message', {
         id: payload.id,
         author: payload.author,
         text: payload.content || (media.length ? (media[0].kind === 'video' ? '영상을 보냄' : '사진을 보냄') : ''),
         channel: channelNames.get(payload.channelId) || null,
         mediaOnly: !payload.content && media.length > 0,
       });
-      for (const m of media) wins.media.webContents.send('media', m);
+      for (const m of media) post(wins.media, 'media', m);
       break;
     }
     case 'ready': {
@@ -173,10 +179,10 @@ function emit(type, payload) {
       for (const m of payload.messages || []) emit('message', m);
       break;
     case 'message_delete':
-      wins.chat.webContents.send('message-delete', payload.id);
+      post(wins.chat, 'message-delete', payload.id);
       break;
     case 'voice':
-      wins.voice.webContents.send('voice', { channelName: payload.channelName || null, members: payload.members || [] });
+      post(wins.voice, 'voice', { channelName: payload.channelName || null, members: payload.members || [] });
       break;
     case 'connection':
       // 디스코드 로그인 세션이 거부되면 만료로 안내
@@ -189,6 +195,7 @@ function emit(type, payload) {
 }
 
 const settingsDeps = {
+  isQuitting: () => quitting,
   config,
   resolveDisplay: (role) => resolveDisplay(role),
   getConnection: () => connection,
@@ -249,7 +256,7 @@ app.whenReady().then(() => {
   screen.on('display-metrics-changed', relayout);
 
   // 게임이 항상 위를 가로채는 경우 대비
-  setInterval(() => Object.values(wins).forEach((w) => w.setAlwaysOnTop(true, 'screen-saver')), 5000);
+  setInterval(() => alive().forEach((w) => w.setAlwaysOnTop(true, 'screen-saver')), 5000);
 
   createTray({
     onToggle: (visible) => { userHidden = !visible; if (userHidden) setInputMode(false); layoutAll(); },
@@ -273,6 +280,8 @@ app.whenReady().then(() => {
 });
 
 app.on('second-instance', () => openSettings(settingsDeps));
+
+app.on('before-quit', () => { quitting = true; });
 
 app.on('will-quit', () => {
   globalShortcut.unregisterAll();

@@ -58,7 +58,7 @@ function setupSettings(deps) {
 }
 
 function openSettings(deps) {
-  if (win) { win.show(); win.focus(); return win; }
+  if (win) { if (win.isMinimized()) win.restore(); win.show(); win.focus(); return win; }
   win = new BrowserWindow({
     width: 880,
     height: 820,
@@ -78,6 +78,7 @@ function openSettings(deps) {
   deps.setEditMode(true);
   win.on('closed', () => {
     win = null;
+    if (deps.isQuitting()) return;   // 앱 종료 중이면 오버레이 창이 이미 없음
     deps.setEditMode(false);
     deps.applyConfig(deps.config.get()); // 저장 안 한 미리보기는 되돌림
   });
