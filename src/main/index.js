@@ -59,7 +59,8 @@ function setConnection(c) {
 // 접속 정보가 바뀌었을 때만 다시 연결
 function startFeed(cfg = config.get()) {
   const key = MOCK ? 'mock' : JSON.stringify([cfg.serverUrl, cfg.sessionToken, cfg.subscribe]);
-  if (feed && key === feedKey) return;
+  // 같은 정보라도 토큰 오류로 멈춘 상태면 저장할 때 다시 시도
+  if (feed && key === feedKey && connection.state !== 'error') return;
   feed && feed.stop();
   feed = null;
   feedKey = key;
