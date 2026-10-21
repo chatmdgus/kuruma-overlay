@@ -38,6 +38,7 @@ function render(next) {
     const name = document.createElement('span');
     name.className = 'nm';
     name.textContent = m.name;
+    if (m.color) name.style.color = m.color;   // 역할 색
 
     row.append(ui.avatar(m), name);
     if (deaf) row.append(ui.icon('headphones', { slash: true, label: '스피커 꺼짐' }));

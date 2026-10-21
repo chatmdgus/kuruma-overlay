@@ -1,0 +1,8 @@
+/* Pretendard JP (SIL Open Font License 1.1, fonts/Pretendard-LICENSE.txt) — 한글·일본어·영문 */
+@font-face {
+  font-family: 'Pretendard JP Variable';
+  font-weight: 45 920;
+  font-style: normal;
+  font-display: block;
+  src: url('fonts/PretendardJPVariable.woff2') format('woff2-variations');
+}

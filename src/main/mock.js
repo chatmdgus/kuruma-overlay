@@ -1,9 +1,9 @@
 // 서버 없이 화면을 확인하기 위한 가짜 데이터 (npm run mock)
 const people = [
-  { id: '1', name: '유키', color: '#85B7EB' },
-  { id: '2', name: '민준', color: '#97C459' },
-  { id: '3', name: 'ハル', color: '#F0997B' },
-  { id: '4', name: '소라', color: '#AFA9EC' },
+  { id: '1', name: '유키', color: '#3498db' },
+  { id: '2', name: '민준', color: null },
+  { id: '3', name: 'ハル', color: '#e67e22' },
+  { id: '4', name: '소라', color: '#9b59b6' },
 ];
 const lines = ['보스 2페이즈 들어감', '오늘 몇 시에 모임?', 'ちょっと休憩するね', 'ㅋㅋㅋ 방금 뭐임', '了解！', '나 곧 들어감'];
 
@@ -33,7 +33,7 @@ function startMock(emit) {
     emit('voice', {
       channelId: 'mock-voice',
       members: [{ id: '0', name: 'チャ', selfMute: false, selfDeaf: false }, ...people].map((p) => ({
-        id: p.id, name: p.name, avatar: null,
+        id: p.id, name: p.name, avatar: null, color: p.color || null,
         selfMute: Math.random() < 0.2, selfDeaf: Math.random() < 0.1, serverMute: false, streaming: false,
       })),
     });

@@ -15,10 +15,11 @@ html, body {
   height: 100%;
   background: transparent;
   overflow: hidden;
-  font-family: 'Pretendard Variable', Pretendard, 'Segoe UI Variable Text', 'Segoe UI', 'Malgun Gothic', 'Yu Gothic UI', sans-serif;
+  font-family: 'Pretendard JP Variable', 'Segoe UI Variable Text', 'Segoe UI', 'Malgun Gothic', 'Yu Gothic UI', sans-serif;
   color: var(--ink);
   user-select: none;
   -webkit-font-smoothing: antialiased;
+  letter-spacing: -0.005em;
 }
 
 .plate {
@@ -54,13 +55,15 @@ html, body {
   width: fit-content; max-width: 100%; box-sizing: border-box;
   padding: 0.3em 0.75em 0.32em 0.32em;
   border-radius: 1.1em;
-  line-height: 1.45;
-  word-break: break-word;
+  line-height: 1.42;
+  font-weight: 500;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
   animation: in 0.16s ease-out;
 }
 .msg .av { margin-top: 0.05em; }
-.msg .name { font-weight: 700; margin-right: 0.4em; }
-.msg .note { color: var(--ink-soft); font-style: italic; }
+.msg .name { font-weight: 700; margin-right: 0.45em; letter-spacing: -0.01em; }
+.msg .note { color: var(--ink-soft); font-weight: 400; }
 @keyframes in { from { opacity: 0; transform: translateX(-6px); } }
 
 .input { display: none; margin-top: 8px; }
@@ -111,8 +114,8 @@ html, body {
 }
 .vrow .av { width: 1.9em; height: 1.9em; font-size: 0.8em; }
 .vrow .av { font-size: 0.8em; }
-.vrow .nm { font-weight: 600; }
-.vrow.muted .nm { color: var(--ink-soft); }
+.vrow .nm { font-weight: 650; letter-spacing: -0.01em; }
+.vrow.muted .nm { opacity: 0.6; }
 .vlist { display: flex; flex-direction: column; align-items: flex-start; gap: var(--vgap); }
 
 /* 아이콘: 기본은 흰색, 꺼진 상태(사선)는 빨간색 */

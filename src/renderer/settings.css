@@ -15,7 +15,7 @@
 }
 
 * { box-sizing: border-box; }
-html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); font: 14px/1.5 'Pretendard Variable', Pretendard, 'Segoe UI Variable Text', 'Segoe UI', 'Malgun Gothic', 'Yu Gothic UI', sans-serif; -webkit-font-smoothing: antialiased; }
+html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); font: 14px/1.5 'Pretendard JP Variable', 'Segoe UI Variable Text', 'Segoe UI', 'Malgun Gothic', 'Yu Gothic UI', sans-serif; -webkit-font-smoothing: antialiased; }
 body { display: flex; flex-direction: column; }
 main { flex: 1; overflow-y: auto; padding: 8px 28px 24px; }
 
