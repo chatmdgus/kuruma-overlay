@@ -15,7 +15,8 @@ const DEFAULTS = {
   overlays: {
     chat: { enabled: true, monitor: 'sub', rect: { x: 0.74, y: 0.34, w: 0.245, h: 0.62 }, fadeSec: 10, maxLines: 8, fontSize: 15 },
     media: { enabled: true, monitor: 'sub', rect: { x: 0.505, y: 0.34, w: 0.225, h: 0.62 }, fadeSec: 8, maxItems: 3 },
-    voice: { enabled: true, monitor: 'main', rect: { x: 0.008, y: 0.015, w: 0.15, h: 0.42 }, scale: 1.25, gap: 6, showControls: true },
+    // 음성은 디스코드 기본 오버레이와 같이 쓰는 걸 기본으로 해서 꺼둠 (설정에서 켤 수 있음)
+    voice: { enabled: false, monitor: 'main', rect: { x: 0.008, y: 0.015, w: 0.15, h: 0.42 }, scale: 1.25, gap: 6, showControls: true },
   },
   hotkeys: { input: 'CommandOrControl+Shift+D' },
 };
