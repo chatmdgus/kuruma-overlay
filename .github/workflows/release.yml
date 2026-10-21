@@ -21,6 +21,9 @@ jobs:
       - name: 의존성 설치
         run: npm install
 
+      - name: 디스코드 창 감지(koffi) 확인
+        run: node -e "const f=require('./src/main/foreground.js'); if(!f.available()) process.exit(1); console.log('맨 앞 창:', f.foregroundExe())"
+
       - name: 설치 파일 빌드
         run: npx electron-builder --win nsis --publish never
 

@@ -17,7 +17,7 @@
       <section>
         <header><h2>서버</h2><span class="pill" id="conn"><i></i><span></span></span></header>
         <div class="rows">
-          <label class="row"><span class="lb">서버 주소<small>서버 주인에게 받은 주소. SSH 터널을 쓰면 비워둠</small></span><input type="text" id="server-url" placeholder="wss://…" spellcheck="false"></label>
+          <label class="row"><span class="lb">서버 주소<small>보통은 비워두면 됨 (기본 서버로 접속)</small></span><input type="text" id="server-url" placeholder="기본 서버" spellcheck="false"></label>
           <div class="row"><span class="lb">앱에서 SSH 터널 열기<small>서버 주인만 해당</small></span><span class="seg" id="ssh-on"></span></div>
           <div id="ssh-fields">
             <div class="row sub"><span class="lb">SSH 상태</span><span class="pill" id="tunnel"><i></i><span></span></span></div>
@@ -101,6 +101,7 @@
         <header><h2>공통</h2></header>
         <div class="rows">
           <div class="row"><span class="lb">말풍선 배경</span><span class="seg" id="bg-opacity"></span></div>
+          <div class="row"><span class="lb">디스코드 창이 맨 앞이면 숨기기</span><span class="seg" id="hide-discord"></span></div>
           <div class="row"><span class="lb">Windows 시작할 때 자동 실행</span><span class="seg" id="at-login"></span></div>
         </div>
       </section>

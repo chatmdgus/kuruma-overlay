@@ -2,6 +2,9 @@ const { app } = require('electron');
 const fs = require('fs');
 const path = require('path');
 
+// 서버 주소 칸을 비워두면 쓰는 공개 중계 주소 (오라클 서버의 Caddy → 127.0.0.1:8790)
+const PUBLIC_SERVER = 'wss://193-123-163-59.sslip.io';
+
 // 위치(rect)는 모니터 기준 비율(0~1)로 저장해서 해상도가 바뀌어도 유지됨
 const DEFAULTS = {
   serverUrl: '',
@@ -12,7 +15,7 @@ const DEFAULTS = {
   ssh: { enabled: false, host: '', user: 'ubuntu', keyPath: '', localPort: 8790, remotePort: 8790 },
   launch: { atLogin: false },
   monitors: { main: null, sub: null },
-  appearance: { bgOpacity: 0.45 },
+  appearance: { bgOpacity: 0.45, hideOnDiscord: true },   // hideOnDiscord: 디스코드 창이 맨 앞이면 숨김
   overlays: {
     chat: { enabled: true, monitor: 'sub', rect: { x: 0.74, y: 0.34, w: 0.245, h: 0.62 }, fadeSec: 10, maxLines: 8, fontSize: 15 },
     media: { enabled: true, monitor: 'sub', rect: { x: 0.505, y: 0.34, w: 0.225, h: 0.62 }, fadeSec: 8, maxItems: 3 },
@@ -53,4 +56,4 @@ function save(next) {
   return cache;
 }
 
-module.exports = { get, save, merge, DEFAULTS, file };
+module.exports = { get, save, merge, DEFAULTS, PUBLIC_SERVER, file };

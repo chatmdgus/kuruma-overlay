@@ -125,7 +125,7 @@ function serverProblem() {
   if (state.ssh.enabled) {
     if (!state.ssh.host) return 'SSH 서버 IP를 입력하세요';
     if (!state.ssh.keyPath) return 'SSH 키 파일을 지정하세요';
-  } else if (!/^wss?:\/\//.test(state.serverUrl)) {
+  } else if (state.serverUrl && !/^wss?:\/\//.test(state.serverUrl)) {
     return '서버 주소는 ws:// 또는 wss:// 로 시작해야 해요';
   }
   return '';
@@ -168,7 +168,7 @@ function setupProblem() {
   return '';
 }
 
-const isConfigured = (cfg) => !!((cfg.auth?.session || cfg.sessionToken) && (cfg.serverUrl || (cfg.ssh?.enabled && cfg.ssh.host && cfg.ssh.keyPath)) && cfg.monitors?.main);
+const isConfigured = (cfg) => !!((cfg.auth?.session || cfg.sessionToken) && (!cfg.ssh?.enabled || (cfg.ssh.host && cfg.ssh.keyPath)) && cfg.monitors?.main);
 
 // ---------- 평소 설정 ----------
 function fillMain() {
@@ -196,6 +196,7 @@ function fillMain() {
 
   bindSeg('bg-opacity', [{ label: '없음', value: 0 }, { label: '연하게', value: 0.3 }, { label: '보통', value: 0.5 }, { label: '진하게', value: 0.72 }],
     () => state.appearance.bgOpacity, (v) => { state.appearance.bgOpacity = v; });
+  bindSeg('hide-discord', ONOFF, () => state.appearance.hideOnDiscord !== false, (v) => { state.appearance.hideOnDiscord = v; }, { live: false });
   bindSeg('at-login', ONOFF, () => !!state.launch.atLogin, (v) => { state.launch.atLogin = v; }, { live: false });
 }
 

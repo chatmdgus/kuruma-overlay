@@ -11,6 +11,7 @@ const { setupSettings, openSettings, notifySettings } = require('./settings');
 const { createTray } = require('./tray');
 const { startTunnel } = require('./tunnel');
 const { login, describeLoginError } = require('./login');
+const { watchForeground } = require('./foreground');
 
 const MOCK = process.argv.includes('--mock');
 const wins = {};
@@ -26,6 +27,7 @@ let inputMode = false;
 let userHidden = false;
 let registeredHotkey = null;
 let quitting = false;
+let discordFront = false;          // 디스코드 창이 맨 앞에 있는지
 // 종료 중에는 창이 먼저 없어질 수 있어서 확인하고 보냄
 const post = (w, ...args) => { if (w && !w.isDestroyed()) w.webContents.send(...args); };
 const alive = () => Object.values(wins).filter((w) => !w.isDestroyed());
@@ -47,7 +49,8 @@ function layoutAll(cfg = config.get()) {
     if (win.isDestroyed()) continue;
     const o = cfg.overlays[name];
     // 음성 오버레이는 쓰지 않음 (디스코드 기본 오버레이 사용)
-    if (!o.enabled || userHidden || name === 'voice') { win.hide(); continue; }
+    const hideForDiscord = discordFront && cfg.appearance.hideOnDiscord;
+    if (!o.enabled || userHidden || hideForDiscord || name === 'voice') { win.hide(); continue; }
     placeOverlay(win, resolveDisplay(o.monitor, cfg), o.rect);
     win.showInactive();
   }
@@ -87,7 +90,8 @@ function syncTunnel(cfg = config.get()) {
 }
 
 // SSH 터널을 쓰고 서버 주소가 비어 있으면 터널 주소로
-const serverUrlOf = (cfg) => cfg.serverUrl || (cfg.ssh.enabled ? `ws://127.0.0.1:${cfg.ssh.localPort}` : '');
+// 서버 주소를 비워두면: SSH 터널을 쓰면 터널, 아니면 공개 서버
+const serverUrlOf = (cfg) => cfg.serverUrl || (cfg.ssh.enabled ? `ws://127.0.0.1:${cfg.ssh.localPort}` : config.PUBLIC_SERVER);
 
 function syncLaunch(cfg = config.get()) {
   // 개발 실행일 때는 electron.exe에 앱 폴더를 넘겨야 함
@@ -249,6 +253,13 @@ app.whenReady().then(() => {
   setupSettings(settingsDeps);
   layoutAll();
   registerHotkey();
+
+  // 디스코드가 맨 앞에 있으면 오버레이 숨기기 (설정에서 끌 수 있음)
+  watchForeground((front) => {
+    discordFront = front;
+    if (front && config.get().appearance.hideOnDiscord) setInputMode(false);
+    layoutAll();
+  });
 
   const relayout = () => layoutAll();
   screen.on('display-added', relayout);
