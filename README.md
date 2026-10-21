@@ -26,8 +26,11 @@ src/
     config.js    설정 기본값과 저장
     relay.js     중계 서버 WebSocket 클라이언트
     mock.js      개발용 가짜 데이터
+    settings.js  설정 창, 배치 미리보기
+    tray.js      트레이 메뉴
   preload.js
-  renderer/      chat / media / voice 오버레이 화면
+  settings-preload.js
+  renderer/      chat / media / voice 오버레이, settings 설정 창
 docs/DESIGN.md
 ```
 
@@ -37,7 +40,7 @@ docs/DESIGN.md
 - [x] 미디어 창: 대기열, 자동 사라짐
 - [x] 음성 창: 참여자, 음소거 상태
 - [x] 메인·서브 모니터 배치 (설정 파일 기준)
-- [ ] 설정 창과 배치 편집기
+- [x] 설정 창과 배치 편집기 (트레이 아이콘 → 설정, 첫 실행 때 자동으로 열림)
+- [x] 트레이 아이콘: 오버레이 숨기기·설정·종료
 - [ ] OAuth2 로그인
-- [ ] 트레이 아이콘
 - [ ] 설치 파일 배포, 자동 업데이트

@@ -40,3 +40,5 @@ window.overlay.on('connection', (online) => {
   if (!online) box.style.display = '';
 });
 render([]);
+
+window.overlay.on('edit-mode', (on) => document.body.classList.toggle('editing', on));

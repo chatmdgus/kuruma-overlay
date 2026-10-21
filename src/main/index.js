@@ -4,32 +4,60 @@ const config = require('./config');
 const { makeOverlay, placeOverlay } = require('./overlay');
 const { startRelay } = require('./relay');
 const { startMock } = require('./mock');
+const { setupSettings, openSettings } = require('./settings');
+const { createTray } = require('./tray');
 
 const wins = {};
 let feed = null;
+let tray = null;
 let inputMode = false;
+let userHidden = false;
+let registeredHotkey = null;
 
-function resolveDisplay(role) {
+if (!app.requestSingleInstanceLock()) app.quit();
+
+function resolveDisplay(role, cfg = config.get()) {
   const displays = screen.getAllDisplays();
   const primary = screen.getPrimaryDisplay();
-  const savedId = config.get().monitors[role];
-  const saved = displays.find((d) => String(d.id) === String(savedId));
+  const saved = displays.find((d) => String(d.id) === String(cfg.monitors[role]));
   if (saved) return saved;
   if (role === 'sub') return displays.find((d) => d.id !== primary.id) || primary;
   return primary;
 }
 
-function layoutAll() {
-  const { overlays } = config.get();
+function layoutAll(cfg = config.get()) {
   for (const [name, win] of Object.entries(wins)) {
-    const o = overlays[name];
-    if (!o.enabled) { win.hide(); continue; }
-    placeOverlay(win, resolveDisplay(o.monitor), o.rect);
+    const o = cfg.overlays[name];
+    if (!o.enabled || userHidden) { win.hide(); continue; }
+    placeOverlay(win, resolveDisplay(o.monitor, cfg), o.rect);
     win.showInactive();
   }
 }
 
+function sendSettings(cfg = config.get()) {
+  const { overlays } = cfg;
+  wins.chat.webContents.send('settings', { fadeSec: overlays.chat.fadeSec, maxLines: overlays.chat.maxLines });
+  wins.media.webContents.send('settings', { fadeSec: overlays.media.fadeSec });
+}
+
+function registerHotkey(cfg = config.get()) {
+  if (registeredHotkey === cfg.hotkeys.input) return;
+  if (registeredHotkey) globalShortcut.unregister(registeredHotkey);
+  registeredHotkey = globalShortcut.register(cfg.hotkeys.input, () => setInputMode(!inputMode)) ? cfg.hotkeys.input : null;
+}
+
+function applyConfig(cfg) {
+  layoutAll(cfg);
+  sendSettings(cfg);
+  registerHotkey(cfg);
+}
+
+function setEditMode(on) {
+  for (const win of Object.values(wins)) win.webContents.send('edit-mode', on);
+}
+
 function setInputMode(on) {
+  if (on && (userHidden || !config.get().overlays.chat.enabled)) return;
   inputMode = on;
   const chat = wins.chat;
   chat.setFocusable(on);
@@ -67,11 +95,13 @@ function emit(type, payload) {
   }
 }
 
-function sendSettings() {
-  const { overlays } = config.get();
-  wins.chat.webContents.send('settings', { fadeSec: overlays.chat.fadeSec, maxLines: overlays.chat.maxLines });
-  wins.media.webContents.send('settings', { fadeSec: overlays.media.fadeSec });
-}
+const settingsDeps = {
+  config,
+  resolveDisplay: (role) => resolveDisplay(role),
+  applyConfig,
+  previewConfig: (partial) => layoutAll(config.merge(config.get(), partial)),
+  setEditMode,
+};
 
 app.whenReady().then(() => {
   for (const name of ['chat', 'media', 'voice']) {
@@ -81,22 +111,27 @@ app.whenReady().then(() => {
   Promise.all(Object.values(wins).map((w) => new Promise((r) => w.webContents.once('did-finish-load', r)))).then(() => {
     sendSettings();
     const cfg = config.get();
-    if (process.argv.includes('--mock') || !cfg.serverUrl) {
-      feed = startMock(emit);
-    } else {
-      feed = startRelay(cfg, emit);
-    }
+    feed = process.argv.includes('--mock') || !cfg.serverUrl ? startMock(emit) : startRelay(cfg, emit);
+    if (!cfg.monitors.main) openSettings(settingsDeps); // 첫 실행: 모니터부터 정하게 함
   });
 
+  setupSettings(settingsDeps);
   layoutAll();
-  screen.on('display-added', layoutAll);
-  screen.on('display-removed', layoutAll);
-  screen.on('display-metrics-changed', layoutAll);
+  registerHotkey();
+
+  const relayout = () => layoutAll();
+  screen.on('display-added', relayout);
+  screen.on('display-removed', relayout);
+  screen.on('display-metrics-changed', relayout);
 
   // 게임이 항상 위를 가로채는 경우 대비
   setInterval(() => Object.values(wins).forEach((w) => w.setAlwaysOnTop(true, 'screen-saver')), 5000);
 
-  globalShortcut.register(config.get().hotkeys.input, () => setInputMode(!inputMode));
+  tray = createTray({
+    onToggle: (visible) => { userHidden = !visible; if (userHidden) setInputMode(false); layoutAll(); },
+    onSettings: () => openSettings(settingsDeps),
+    onQuit: () => app.quit(),
+  });
 
   ipcMain.on('send', (_e, content) => {
     const text = String(content || '').trim().slice(0, 2000);
@@ -106,9 +141,12 @@ app.whenReady().then(() => {
   ipcMain.on('end-input', () => setInputMode(false));
 });
 
+app.on('second-instance', () => openSettings(settingsDeps));
+
 app.on('will-quit', () => {
   globalShortcut.unregisterAll();
   feed && feed.stop();
 });
 
-app.on('window-all-closed', () => app.quit());
+// 설정 창을 닫아도 오버레이와 트레이는 계속 실행
+app.on('window-all-closed', (e) => e.preventDefault());

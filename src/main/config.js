@@ -41,4 +41,4 @@ function save(next) {
   return cache;
 }
 
-module.exports = { get, save, DEFAULTS };
+module.exports = { get, save, merge, DEFAULTS };

@@ -32,3 +32,14 @@ html, body {
 .state { margin-left: auto; font-size: 11px; color: #f09595; }
 .offline { font-size: 11px; color: #f09595; display: none; }
 .offline.on { display: block; }
+
+/* 설정 창이 열려 있는 동안 오버레이 영역 표시 */
+body.editing::after {
+  content: attr(data-name);
+  position: fixed; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  border: 2px dashed rgba(255, 255, 255, 0.75); border-radius: 6px;
+  background: rgba(88, 101, 242, 0.18);
+  font-size: 15px; font-weight: 600; color: #fff;
+  pointer-events: none;
+}

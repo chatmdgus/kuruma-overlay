@@ -32,3 +32,5 @@ window.overlay.on('media', (item) => {
   queue.push(item);
   if (!showing) next();
 });
+
+window.overlay.on('edit-mode', (on) => document.body.classList.toggle('editing', on));

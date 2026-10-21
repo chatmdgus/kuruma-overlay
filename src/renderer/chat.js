@@ -51,3 +51,5 @@ text.addEventListener('keydown', (e) => {
     window.overlay.endInput();
   }
 });
+
+window.overlay.on('edit-mode', (on) => document.body.classList.toggle('editing', on));
