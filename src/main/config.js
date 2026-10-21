@@ -29,7 +29,12 @@ function merge(base, extra) {
 function get() {
   if (cache) return cache;
   let saved = {};
-  try { saved = JSON.parse(fs.readFileSync(file(), 'utf8')); } catch { /* 첫 실행 */ }
+  try {
+    // 메모장으로 저장하면 BOM이 붙을 수 있어서 제거
+    saved = JSON.parse(fs.readFileSync(file(), 'utf8').replace(/^﻿/, ''));
+  } catch (e) {
+    if (e.code !== 'ENOENT') console.error('[config] config.json 읽기 실패, 기본값 사용:', e.message);
+  }
   cache = merge(DEFAULTS, saved);
   return cache;
 }
