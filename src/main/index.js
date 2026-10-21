@@ -16,6 +16,7 @@ const wins = {};
 let feed = null;
 let feedKey = '';
 let connection = { state: 'setup' };
+const channelNames = new Map();   // 채널 ID → 이름 (서버의 ready 메시지에서 받음)
 let tunnel = null;
 let tunnelKey = '';
 let tunnelState = { state: 'off' };
@@ -94,6 +95,7 @@ function startFeed(cfg = config.get()) {
   feed = null;
   feedKey = key;
   for (const w of Object.values(wins)) w.webContents.send('reset');
+  channelNames.clear();
   if (MOCK) feed = startMock(emit);
   else if (url && cfg.sessionToken) feed = startRelay({ ...cfg, serverUrl: url }, emit);
   else setConnection({ state: 'setup' });
@@ -122,6 +124,12 @@ function setInputMode(on) {
   chat.webContents.send('input-mode', on);
 }
 
+// 입력창에 "어느 채널로 보내는지" 표시
+function sendTarget(cfg = config.get()) {
+  const id = MOCK ? 'mock' : cfg.subscribe.channelIds[0];
+  wins.chat.webContents.send('target', channelNames.get(id) || null);
+}
+
 function emit(type, payload) {
   switch (type) {
     case 'message': {
@@ -130,9 +138,16 @@ function emit(type, payload) {
         id: payload.id,
         author: payload.author,
         text: payload.content || (media.length ? (media[0].kind === 'video' ? '영상을 보냄' : '사진을 보냄') : ''),
+        channel: channelNames.get(payload.channelId) || null,
         mediaOnly: !payload.content && media.length > 0,
       });
       for (const m of media) wins.media.webContents.send('media', m);
+      break;
+    }
+    case 'ready': {
+      channelNames.clear();
+      for (const g of payload.guilds || []) for (const c of g.channels || []) channelNames.set(c.id, c.name);
+      sendTarget();
       break;
     }
     case 'history':

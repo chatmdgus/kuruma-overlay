@@ -40,6 +40,7 @@ function startMock(emit) {
     });
   }, 3500);
 
+  emit('ready', { user: { id: '0', name: 'チャ' }, guilds: [{ id: 'g', name: '서버', channels: [{ id: 'mock', name: '자유', type: 'text' }] }] });
   emit('connection', { state: 'online', mock: true, user: { id: '0', name: 'チャ' } });
 
   return {

@@ -21,7 +21,7 @@ function scheduleFade(row) {
   }, settings.fadeSec * 1000);
 }
 
-function addMessage({ id, author = {}, text: body, mediaOnly }) {
+function addMessage({ id, author = {}, text: body, mediaOnly, channel }) {
   const row = document.createElement('div');
   row.className = 'msg plate fade';
   row.dataset.id = id;
@@ -34,6 +34,12 @@ function addMessage({ id, author = {}, text: body, mediaOnly }) {
   const span = document.createElement('span');
   span.textContent = body;
   if (mediaOnly) span.className = 'note';
+  if (channel) {
+    const tag = document.createElement('span');
+    tag.className = 'ch';
+    tag.textContent = `#${channel}`;
+    line.append(tag);
+  }
   line.append(name, span);
 
   row.append(ui.avatar(author), line);
@@ -46,6 +52,10 @@ window.overlay.on('settings', (s) => { settings = { ...settings, ...s }; applySe
 window.overlay.on('message', addMessage);
 window.overlay.on('message-delete', (id) => list.querySelector(`[data-id="${CSS.escape(id)}"]`)?.remove());
 window.overlay.on('reset', () => list.replaceChildren());
+// 입력창: 어느 채널로 보내는지
+window.overlay.on('target', (ch) => {
+  text.placeholder = ch ? `#${ch}에 보내기 · Enter 보내기 · Esc 닫기` : '메시지 입력 · Enter 보내기 · Esc 닫기';
+});
 
 window.overlay.on('input-mode', (on) => {
   inputMode = on;

@@ -61,6 +61,7 @@ html, body {
   overflow-wrap: anywhere;
 }
 .msg .av { margin-top: 0.05em; }
+.msg .ch { font-size: 0.78em; font-weight: 700; color: var(--ink-soft); margin-right: 0.45em; padding: 0.05em 0.4em; border-radius: 0.4em; background: rgba(255, 255, 255, 0.1); text-shadow: none; vertical-align: 0.08em; }
 .msg .name { font-weight: 700; margin-right: 0.45em; letter-spacing: -0.01em; }
 .msg .note { color: var(--ink-soft); font-weight: 400; }
 
