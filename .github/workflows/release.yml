@@ -31,6 +31,14 @@ jobs:
           REPO: chatmdgus/kuruma-downloads
           TAG: overlay-latest
         run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo "::error::DOWNLOADS_TOKEN 비밀값이 없음. kuruma-overlay → Settings → Secrets and variables → Actions → Repository secrets 에 넣어야 함"
+            exit 1
+          fi
+          if ! gh api "repos/$REPO" --jq .full_name >/dev/null; then
+            echo "::error::DOWNLOADS_TOKEN 으로 $REPO 에 접근할 수 없음. 토큰이 만료됐거나 저장소 선택·Contents 권한이 빠졌는지 확인"
+            exit 1
+          fi
           VERSION=$(node -p "require('./package.json').version")
           NOTES="Kuruma Overlay v${VERSION} ($(date -u +%Y-%m-%d))"
           gh release view "$TAG" -R "$REPO" >/dev/null 2>&1 || gh release create "$TAG" -R "$REPO" --title "Kuruma Overlay" --notes "$NOTES"
