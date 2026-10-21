@@ -1,5 +1,6 @@
 const $ = (id) => document.getElementById(id);
-const NAMES = { chat: '채팅', media: '사진·영상', voice: '음성' };
+// 음성은 디스코드 기본 오버레이를 쓰기로 해서 설정에서 뺌 (코드는 남겨둠)
+const NAMES = { chat: '채팅', media: '사진·영상' };
 const SNAP = 0.015;
 const MIN = 0.04;
 
@@ -143,9 +144,6 @@ function fillMain() {
   bindSeg('media-max', [1, 2, 3].map((v) => ({ label: `${v}장`, value: v })), () => o.media.maxItems, (v) => { o.media.maxItems = v; });
   bindSeg('media-fade', [5, 8, 10].map((v) => ({ label: `${v}초`, value: v })), () => o.media.fadeSec, (v) => { o.media.fadeSec = v; });
 
-  bindSeg('voice-size', SIZE3([1, 1.25, 1.6]), () => o.voice.scale, (v) => { o.voice.scale = v; });
-  bindSeg('voice-gap', [{ label: '좁게', value: 2 }, { label: '보통', value: 6 }, { label: '넓게', value: 12 }], () => o.voice.gap, (v) => { o.voice.gap = v; });
-  bindSeg('voice-controls', [{ label: '표시', value: true }, { label: '숨김', value: false }], () => o.voice.showControls !== false, (v) => { o.voice.showControls = v; });
 
   bindSeg('bg-opacity', [{ label: '없음', value: 0 }, { label: '연하게', value: 0.3 }, { label: '보통', value: 0.5 }, { label: '진하게', value: 0.72 }],
     () => state.appearance.bgOpacity, (v) => { state.appearance.bgOpacity = v; });

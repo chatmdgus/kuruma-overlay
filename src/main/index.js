@@ -38,7 +38,8 @@ function resolveDisplay(role, cfg = config.get()) {
 function layoutAll(cfg = config.get()) {
   for (const [name, win] of Object.entries(wins)) {
     const o = cfg.overlays[name];
-    if (!o.enabled || userHidden) { win.hide(); continue; }
+    // 음성 오버레이는 쓰지 않음 (디스코드 기본 오버레이 사용)
+    if (!o.enabled || userHidden || name === 'voice') { win.hide(); continue; }
     placeOverlay(win, resolveDisplay(o.monitor, cfg), o.rect);
     win.showInactive();
   }
