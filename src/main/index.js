@@ -142,7 +142,7 @@ function emit(type, payload) {
       wins.chat.webContents.send('message-delete', payload.id);
       break;
     case 'voice':
-      wins.voice.webContents.send('voice', payload.members || []);
+      wins.voice.webContents.send('voice', { channelName: payload.channelName || null, members: payload.members || [] });
       break;
     case 'connection':
       setConnection(payload);

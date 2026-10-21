@@ -1,0 +1,38 @@
+# 태그(v0.2.0 등)를 올리면 Windows 설치 파일을 빌드해서
+# 공개 저장소 chatmdgus/kuruma-downloads 의 overlay-latest 릴리스에 올림.
+# 필요한 것: 이 저장소 Secrets 에 DOWNLOADS_TOKEN (kuruma-downloads Contents 읽기·쓰기 권한 토큰)
+name: release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: 의존성 설치
+        run: npm install
+
+      - name: 설치 파일 빌드
+        run: npx electron-builder --win nsis --publish never
+
+      - name: kuruma-downloads 에 올리기
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.DOWNLOADS_TOKEN }}
+          REPO: chatmdgus/kuruma-downloads
+          TAG: overlay-latest
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          NOTES="Kuruma Overlay v${VERSION} ($(date -u +%Y-%m-%d))"
+          gh release view "$TAG" -R "$REPO" >/dev/null 2>&1 || gh release create "$TAG" -R "$REPO" --title "Kuruma Overlay" --notes "$NOTES"
+          gh release upload "$TAG" "dist/KurumaOverlay-Setup.exe" -R "$REPO" --clobber
+          gh release edit "$TAG" -R "$REPO" --notes "$NOTES"

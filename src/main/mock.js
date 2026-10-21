@@ -32,12 +32,13 @@ function startMock(emit) {
   const voiceTimer = setInterval(() => {
     emit('voice', {
       channelId: 'mock-voice',
-      members: [{ id: '0', name: 'チャ', selfMute: false, selfDeaf: false }, ...people].map((p) => ({
+      channelName: '게임방',
+      members: [{ id: '0', name: 'チャ', color: '#f1c40f' }, ...people.filter(() => Math.random() > 0.2)].map((p) => ({
         id: p.id, name: p.name, avatar: null, color: p.color || null,
         selfMute: Math.random() < 0.2, selfDeaf: Math.random() < 0.1, serverMute: false, streaming: p.id === '1', video: p.id === '3',
       })),
     });
-  }, 6000);
+  }, 3500);
 
   emit('connection', { state: 'online', mock: true, user: { id: '0', name: 'チャ' } });
 

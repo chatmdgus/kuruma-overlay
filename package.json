@@ -32,7 +32,8 @@
       "perMachine": false,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "Kuruma Overlay"
+      "shortcutName": "Kuruma Overlay",
+      "artifactName": "KurumaOverlay-Setup.${ext}"
     }
   }
 }

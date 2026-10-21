@@ -58,6 +58,10 @@ window.ui = (() => {
       g.append(svgEl('rect', { x: 2.5, y: 13, width: 5, height: 8, rx: 2, fill: 'currentColor' }));
       g.append(svgEl('rect', { x: 16.5, y: 13, width: 5, height: 8, rx: 2, fill: 'currentColor' }));
     },
+    speaker: (g) => {
+      g.append(svgEl('path', { d: 'M3 9.5h3.5L11 5.5v13l-4.5-4H3z', fill: 'currentColor' }));
+      g.append(svgEl('path', { d: 'M14.5 9a4 4 0 0 1 0 6M17 6.5a7.5 7.5 0 0 1 0 11', fill: 'none', stroke: 'currentColor', 'stroke-width': 2, 'stroke-linecap': 'round' }));
+    },
     camera: (g) => {
       g.append(svgEl('rect', { x: 2.5, y: 6, width: 13, height: 12, rx: 2.5, fill: 'currentColor' }));
       g.append(svgEl('path', { d: 'M16.5 10.2l5-3v9.6l-5-3z', fill: 'currentColor' }));

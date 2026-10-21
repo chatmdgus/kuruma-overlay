@@ -24,6 +24,11 @@ npm.cmd run dist
 `dist\Kuruma Overlay Setup <버전>.exe`를 실행하면 설치되고 바탕화면·시작 메뉴에 아이콘이 생김. 설정은 개발 실행과 같은 폴더를 써서 그대로 이어짐.
 코드 서명이 없어서 처음 실행할 때 SmartScreen 경고가 뜨면 추가 정보 → 실행.
 
+### 배포
+
+`v`로 시작하는 태그(예: `v0.2.0`)를 올리면 GitHub Actions가 설치 파일을 빌드해서 공개 저장소 `kuruma-downloads`의 `overlay-latest` 릴리스에 올림. 다운로드 사이트는 그 파일을 가리킴.
+필요한 것: 이 저장소 Secrets에 `DOWNLOADS_TOKEN` (kuruma-downloads에 Contents 읽기·쓰기 권한이 있는 토큰).
+
 ### 처음 설정
 
 - 서버 연결(토큰, 서버 ID, 채팅 채널 ID)과 모니터는 처음 한 번만 입력
