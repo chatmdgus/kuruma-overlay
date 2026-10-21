@@ -3,7 +3,7 @@ const NAMES = { chat: '채팅', media: '미디어', voice: '음성' };
 const SNAP = 0.015;
 const MIN = 0.04;
 
-let state = null;      // 편집 중인 설정 (monitors, overlays, hotkeys)
+let state = null;      // 편집 중인 설정 (monitors, overlays, appearance, hotkeys, 연결)
 let defaults = null;
 let displays = [];
 let resolved = {};
@@ -76,7 +76,7 @@ function render() {
     const r = monitorBox(d);
     const el = document.createElement('div');
     const roles = rolesOf(d);
-    el.className = 'mon' + (roles.length ? ` role-${roles.includes('메인') ? 'main' : 'sub'}` : ' none');
+    el.className = 'mon' + (roles.length ? ' used' : '');
     Object.assign(el.style, { left: `${r.left}px`, top: `${r.top}px`, width: `${r.width}px`, height: `${r.height}px` });
     const tag = document.createElement('div');
     tag.className = 'tag';
@@ -175,29 +175,69 @@ function startDrag(e, name, mode) {
 }
 
 // ---------- 표시 옵션 ----------
+// 슬라이더: 값이 바뀌면 state에 넣고 바로 미리보기
+function bindRange(id, get, set, fmt) {
+  const el = $(id);
+  const out = $(`${id}-out`);
+  el.value = get();
+  out.textContent = fmt(Number(el.value));
+  el.oninput = () => { set(Number(el.value)); out.textContent = fmt(Number(el.value)); preview(); };
+}
+
 function fillOptions() {
+  const o = state.overlays;
   for (const name of Object.keys(NAMES)) {
     const cb = $(`en-${name}`);
-    cb.checked = state.overlays[name].enabled;
-    cb.onchange = () => { state.overlays[name].enabled = cb.checked; render(); preview(); };
+    cb.checked = o[name].enabled;
+    cb.onchange = () => { o[name].enabled = cb.checked; render(); preview(); };
   }
 
-  $('chat-fade').value = String(state.overlays.chat.fadeSec);
-  $('chat-fade').onchange = (e) => { state.overlays.chat.fadeSec = Number(e.target.value); };
-
-  $('chat-lines').value = state.overlays.chat.maxLines;
-  $('chat-lines').onchange = (e) => {
-    const n = Math.round(Number(e.target.value));
-    state.overlays.chat.maxLines = Math.min(15, Math.max(1, Number.isFinite(n) ? n : 5));
-    e.target.value = state.overlays.chat.maxLines;
-  };
-
-  const mf = $('media-fade');
-  mf.value = state.overlays.media.fadeSec;
-  $('media-fade-out').textContent = `${mf.value}초`;
-  mf.oninput = () => { state.overlays.media.fadeSec = Number(mf.value); $('media-fade-out').textContent = `${mf.value}초`; };
-
+  $('chat-fade').value = String(o.chat.fadeSec);
+  $('chat-fade').onchange = (e) => { o.chat.fadeSec = Number(e.target.value); preview(); };
+  bindRange('chat-lines', () => o.chat.maxLines, (v) => { o.chat.maxLines = v; }, (v) => `${v}줄`);
+  bindRange('chat-font', () => o.chat.fontSize, (v) => { o.chat.fontSize = v; }, (v) => `${v}px`);
   $('hotkey').value = state.hotkeys.input.replace('CommandOrControl', 'Ctrl');
+
+  bindRange('media-max', () => o.media.maxItems, (v) => { o.media.maxItems = v; }, (v) => `${v}장`);
+  bindRange('media-fade', () => o.media.fadeSec, (v) => { o.media.fadeSec = v; }, (v) => `${v}초`);
+
+  bindRange('voice-scale', () => o.voice.scale, (v) => { o.voice.scale = v; }, (v) => `${Math.round(v * 100)}%`);
+  bindRange('voice-gap', () => o.voice.gap, (v) => { o.voice.gap = v; }, (v) => `${v}px`);
+  $('voice-controls').checked = o.voice.showControls !== false;
+  $('voice-controls').onchange = (e) => { o.voice.showControls = e.target.checked; preview(); };
+
+  bindRange('bg-opacity', () => state.appearance.bgOpacity, (v) => { state.appearance.bgOpacity = v; }, (v) => `${Math.round(v * 100)}%`);
+}
+
+// ---------- 연결 ----------
+const CONN_TEXT = { setup: '연결 안 됨', connecting: '연결하는 중', online: '연결됨', offline: '연결 끊김', error: '토큰이 맞지 않음' };
+
+function showConnection(c) {
+  const el = $('conn');
+  el.dataset.state = c?.state || 'setup';
+  el.lastChild.textContent = c?.mock ? '가짜 데이터 모드' : (c?.reason === 'bad_url' ? '주소가 올바르지 않음' : (CONN_TEXT[c?.state] || ''));
+}
+
+const splitIds = (v) => v.split(/[,\s]+/).map((x) => x.trim()).filter(Boolean);
+
+function fillConnection(cfg) {
+  $('server-url').value = cfg.serverUrl || '';
+  $('token').value = cfg.sessionToken || '';
+  $('guild-id').value = cfg.subscribe?.guildId || '';
+  $('channel-ids').value = (cfg.subscribe?.channelIds || []).join(', ');
+  $('token-show').onclick = () => {
+    const t = $('token');
+    t.type = t.type === 'password' ? 'text' : 'password';
+    $('token-show').textContent = t.type === 'password' ? '보기' : '숨기기';
+  };
+}
+
+function readConnection() {
+  return {
+    serverUrl: $('server-url').value.trim(),
+    sessionToken: $('token').value.trim(),
+    subscribe: { guildId: $('guild-id').value.trim(), channelIds: splitIds($('channel-ids').value), voiceChannelIds: [] },
+  };
 }
 
 // ---------- 미리보기와 저장 ----------
@@ -205,7 +245,7 @@ let previewTimer = null;
 function preview() {
   clearTimeout(previewTimer);
   previewTimer = setTimeout(() => {
-    window.settingsApi.preview({ monitors: state.monitors, overlays: state.overlays });
+    window.settingsApi.preview({ monitors: state.monitors, overlays: state.overlays, appearance: state.appearance });
   }, 40);
 }
 
@@ -219,8 +259,8 @@ $('reset').onclick = () => {
 };
 
 $('save').onclick = async () => {
-  await window.settingsApi.save({ monitors: state.monitors, overlays: state.overlays });
-  $('status').textContent = '저장됨';
+  await window.settingsApi.save({ monitors: state.monitors, overlays: state.overlays, appearance: state.appearance, ...readConnection() });
+  $('status').textContent = '저장함';
   setTimeout(() => { $('status').textContent = ''; }, 2000);
 };
 
@@ -230,13 +270,16 @@ window.addEventListener('resize', () => state && render());
 
 (async () => {
   const res = await window.settingsApi.get();
-  state = clone({ monitors: res.config.monitors, overlays: res.config.overlays, hotkeys: res.config.hotkeys });
+  state = clone({ monitors: res.config.monitors, overlays: res.config.overlays, appearance: res.config.appearance, hotkeys: res.config.hotkeys });
   defaults = res.defaults;
   displays = res.displays;
   resolved = res.resolved;
   // 처음엔 실제로 쓰이는 모니터를 명시해 둠
   state.monitors.main = state.monitors.main ?? resolved.main;
   state.monitors.sub = state.monitors.sub ?? resolved.sub;
+  fillConnection(res.config);
+  showConnection(res.mock ? { state: 'online', mock: true } : res.connection);
+  window.settingsApi.onConnection(showConnection);
   fillSelects();
   fillOptions();
   render();

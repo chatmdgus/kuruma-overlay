@@ -5,4 +5,5 @@ contextBridge.exposeInMainWorld('settingsApi', {
   preview: (partial) => ipcRenderer.invoke('settings:preview', partial),
   save: (partial) => ipcRenderer.invoke('settings:save', partial),
   close: () => ipcRenderer.invoke('settings:close'),
+  onConnection: (cb) => ipcRenderer.on('connection', (_e, c) => cb(c)),
 });

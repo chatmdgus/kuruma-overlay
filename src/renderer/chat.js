@@ -1,9 +1,16 @@
+const chat = document.getElementById('chat');
 const list = document.getElementById('list');
 const inputBox = document.getElementById('input');
 const text = document.getElementById('text');
 
-let settings = { fadeSec: 10, maxLines: 5 };
+let settings = { fadeSec: 10, maxLines: 8, fontSize: 15, bgOpacity: 0.45 };
 let inputMode = false;
+
+function applySettings() {
+  chat.style.setProperty('--fs', `${settings.fontSize}px`);
+  document.documentElement.style.setProperty('--bg', settings.bgOpacity);
+  while (list.children.length > settings.maxLines) list.firstChild.remove();
+}
 
 function scheduleFade(row) {
   clearTimeout(row._timer);
@@ -14,24 +21,31 @@ function scheduleFade(row) {
   }, settings.fadeSec * 1000);
 }
 
-function addMessage({ id, author, text: body }) {
+function addMessage({ id, author = {}, text: body, mediaOnly }) {
   const row = document.createElement('div');
-  row.className = 'msg fade';
+  row.className = 'msg plate fade';
   row.dataset.id = id;
-  const name = document.createElement('b');
-  name.textContent = author?.name ?? '?';
-  if (author?.color) name.style.color = author.color;
+
+  const line = document.createElement('span');
+  const name = document.createElement('span');
+  name.className = 'name';
+  name.textContent = author.name ?? '?';
+  name.style.color = ui.colorFor(author.id, author.color);
   const span = document.createElement('span');
   span.textContent = body;
-  row.append(name, span);
+  if (mediaOnly) span.className = 'note';
+  line.append(name, span);
+
+  row.append(ui.avatar(author), line);
   list.appendChild(row);
   while (list.children.length > settings.maxLines) list.firstChild.remove();
   scheduleFade(row);
 }
 
-window.overlay.on('settings', (s) => { settings = { ...settings, ...s }; });
+window.overlay.on('settings', (s) => { settings = { ...settings, ...s }; applySettings(); });
 window.overlay.on('message', addMessage);
 window.overlay.on('message-delete', (id) => list.querySelector(`[data-id="${CSS.escape(id)}"]`)?.remove());
+window.overlay.on('reset', () => list.replaceChildren());
 
 window.overlay.on('input-mode', (on) => {
   inputMode = on;
@@ -52,4 +66,5 @@ text.addEventListener('keydown', (e) => {
   }
 });
 
-window.overlay.on('edit-mode', (on) => document.body.classList.toggle('editing', on));
+ui.bindStatus(document.getElementById('status'));
+applySettings();

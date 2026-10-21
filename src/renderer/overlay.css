@@ -1,45 +1,182 @@
+:root {
+  --ink: #f4f5f8;
+  --ink-soft: #c3c8d4;
+  --plate: 12, 14, 20;          /* 말풍선 바탕색 (RGB) */
+  --bg: 0.45;                   /* 말풍선 진하기, 설정에서 바뀜 */
+  --edge: rgba(255, 255, 255, 0.08);
+  --accent: #a7b4ff;
+  --danger: #ff7a7a;
+  --ok: #7be0a8;
+  --fs: 15px;
+}
+
 html, body {
   margin: 0;
   height: 100%;
   background: transparent;
   overflow: hidden;
-  font-family: 'Segoe UI', 'Malgun Gothic', 'Yu Gothic UI', sans-serif;
-  color: #f1efe8;
+  font-family: 'Pretendard Variable', Pretendard, 'Segoe UI Variable Text', 'Segoe UI', 'Malgun Gothic', 'Yu Gothic UI', sans-serif;
+  color: var(--ink);
   user-select: none;
+  -webkit-font-smoothing: antialiased;
 }
 
-.fade { transition: opacity 0.5s; }
+.plate {
+  background: rgba(var(--plate), var(--bg));
+  box-shadow: inset 0 0 0 1px var(--edge);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.85), 0 0 1px rgba(0, 0, 0, 0.9);
+}
+
+.fade { transition: opacity 0.5s ease, transform 0.5s ease; }
 .gone { opacity: 0; }
 
-/* 채팅 */
-.chat { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: flex-end; gap: 4px; padding: 6px; box-sizing: border-box; }
-.list { display: flex; flex-direction: column; gap: 4px; }
-.msg { background: rgba(0, 0, 0, 0.55); border-radius: 6px; padding: 4px 9px; font-size: 14px; line-height: 1.45; word-break: break-word; }
-.msg b { font-weight: 600; margin-right: 6px; }
-.input { display: none; }
+.av {
+  flex: none;
+  width: 1.6em; height: 1.6em;
+  border-radius: 50%;
+  display: grid; place-items: center;
+  font-size: 0.78em; font-weight: 700;
+  color: #0d0f14; text-shadow: none;
+  overflow: hidden;
+}
+.av img { width: 100%; height: 100%; object-fit: cover; }
+
+/* ── 채팅 ─────────────────────────── */
+.chat {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column; justify-content: flex-end;
+  padding: 8px; box-sizing: border-box;
+  font-size: var(--fs);
+}
+.list { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
+.msg {
+  display: flex; align-items: flex-start; gap: 0.5em;
+  width: fit-content; max-width: 100%; box-sizing: border-box;
+  padding: 0.3em 0.75em 0.32em 0.32em;
+  border-radius: 1.1em;
+  line-height: 1.45;
+  word-break: break-word;
+  animation: in 0.16s ease-out;
+}
+.msg .av { margin-top: 0.05em; }
+.msg .name { font-weight: 700; margin-right: 0.4em; }
+.msg .note { color: var(--ink-soft); font-style: italic; }
+@keyframes in { from { opacity: 0; transform: translateX(-6px); } }
+
+.input { display: none; margin-top: 8px; }
 .input.on { display: block; }
-.input input { width: 100%; box-sizing: border-box; height: 30px; font-size: 14px; color: #fff; background: rgba(0, 0, 0, 0.75); border: 1px solid #378add; border-radius: 6px; padding: 0 8px; outline: none; }
+.input input {
+  width: 100%; box-sizing: border-box;
+  height: 2.3em; padding: 0 1em;
+  font: inherit; color: var(--ink);
+  background: rgba(var(--plate), 0.88);
+  border: 1px solid var(--accent); border-radius: 1.15em;
+  outline: none;
+}
+.input input::placeholder { color: var(--ink-soft); }
 
-/* 미디어 */
-.media { position: absolute; inset: 0; display: flex; align-items: flex-end; justify-content: flex-end; padding: 6px; box-sizing: border-box; }
-.media img, .media video { max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 6px; }
+/* ── 미디어 ───────────────────────── */
+.media {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column; justify-content: flex-end; align-items: flex-end;
+  gap: 8px; padding: 8px; box-sizing: border-box;
+}
+.media .item {
+  display: block;
+  max-width: 100%;
+  max-height: calc((100% - (var(--n) - 1) * 8px) / var(--n));
+  object-fit: contain;
+  border-radius: 12px;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.14), 0 6px 20px rgba(0, 0, 0, 0.35);
+  min-height: 0;
+  animation: pop 0.18s ease-out;
+}
+@keyframes pop { from { opacity: 0; transform: scale(0.97); } }
 
-/* 음성 */
-.voice { display: inline-flex; flex-direction: column; gap: 4px; margin: 6px; padding: 6px 9px; background: rgba(0, 0, 0, 0.5); border-radius: 8px; min-width: 120px; }
-.row { display: flex; align-items: center; gap: 7px; font-size: 13px; }
-.av { width: 20px; height: 20px; border-radius: 50%; flex: none; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; background: #5f5e5a; overflow: hidden; }
-.av img { width: 100%; height: 100%; }
-.state { margin-left: auto; font-size: 11px; color: #f09595; }
-.offline { font-size: 11px; color: #f09595; display: none; }
-.offline.on { display: block; }
+/* ── 음성 ─────────────────────────── */
+.voice {
+  --vs: 1;
+  --vgap: 6px;
+  position: absolute; inset: 0;
+  padding: 6px; box-sizing: border-box;
+  display: flex; flex-direction: column; align-items: flex-start; gap: var(--vgap);
+  font-size: calc(14px * var(--vs));
+}
+.vrow {
+  display: flex; align-items: center; gap: 0.55em;
+  width: fit-content;
+  padding: 0.22em 0.8em 0.22em 0.22em;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.vrow .av { width: 1.9em; height: 1.9em; font-size: 0.8em; }
+.vrow .av { font-size: 0.8em; }
+.vrow .nm { font-weight: 600; }
+.vrow.muted .nm { color: var(--ink-soft); }
+.vlist { display: flex; flex-direction: column; align-items: flex-start; gap: var(--vgap); }
 
-/* 설정 창이 열려 있는 동안 오버레이 영역 표시 */
+/* 아이콘: 기본은 흰색, 꺼진 상태(사선)는 빨간색 */
+.ic { width: 1.15em; height: 1.15em; flex: none; color: var(--ink); filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.7)); }
+.ic.slashed { color: var(--danger); }
+.vrow .ic { margin-left: 0.1em; }
+
+/* 내 상태 + 설정 버튼 막대 */
+.bar {
+  display: inline-flex; align-items: center; gap: 0.15em;
+  padding: 0.2em 0.25em;
+  border-radius: 0.6em;
+}
+.bar[hidden], .bar [hidden] { display: none; }
+.me-state, .gear {
+  display: grid; place-items: center;
+  width: 1.9em; height: 1.9em;
+  border-radius: 0.45em;
+}
+.me-state .ic, .gear .ic { width: 1.25em; height: 1.25em; }
+.gear {
+  border: 0; padding: 0; margin: 0;
+  background: transparent; color: var(--ink);
+  cursor: pointer;
+}
+.gear:hover { background: rgba(255, 255, 255, 0.12); }
+.gear:hover .ic { transform: rotate(30deg); transition: transform 0.2s ease; }
+.gear:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+/* ── 연결 상태 ────────────────────── */
+.status {
+  display: none;
+  width: fit-content;
+  align-items: center; gap: 0.5em;
+  padding: 0.3em 0.8em;
+  border-radius: 999px;
+  font-size: 12.5px; font-weight: 600;
+  color: var(--ink-soft);
+}
+.status.on { display: inline-flex; }
+.status i { width: 7px; height: 7px; border-radius: 50%; background: var(--ink-soft); }
+.status[data-state=offline] i, .status[data-state=error] i { background: var(--danger); }
+.status[data-state=connecting] i { background: var(--accent); animation: blink 1s infinite alternate; }
+@keyframes blink { to { opacity: 0.3; } }
+
+/* ── 설정 창이 열려 있는 동안 오버레이 영역 표시 ── */
+body.editing::before {
+  content: '';
+  position: fixed; inset: 1px;
+  border: 1.5px dashed rgba(167, 180, 255, 0.9);
+  border-radius: 10px;
+  pointer-events: none;
+}
 body.editing::after {
   content: attr(data-name);
-  position: fixed; inset: 0;
-  display: flex; align-items: center; justify-content: center;
-  border: 2px dashed rgba(255, 255, 255, 0.75); border-radius: 6px;
-  background: rgba(88, 101, 242, 0.18);
-  font-size: 15px; font-weight: 600; color: #fff;
+  position: fixed; left: 8px; top: 8px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: rgba(167, 180, 255, 0.95);
+  color: #11131a;
+  font-size: 12px; font-weight: 700;
   pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; transition: none !important; }
 }

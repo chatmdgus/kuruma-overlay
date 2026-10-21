@@ -9,56 +9,87 @@
 <body>
   <main>
     <section>
-      <h2>모니터</h2>
-      <div class="grid2">
-        <label>메인 모니터 <span class="hint">게임 쪽</span>
-          <select id="mon-main"></select>
-        </label>
-        <label>서브 모니터 <span class="hint">유튜브 쪽</span>
-          <select id="mon-sub"></select>
-        </label>
+      <header><h2>연결</h2><span class="conn" id="conn"><i></i><span></span></span></header>
+      <div class="rows">
+        <label class="row"><span class="lb">서버 주소</span>
+          <input type="text" id="server-url" placeholder="ws://127.0.0.1:8790" spellcheck="false"></label>
+        <label class="row"><span class="lb">토큰<small>서버 주인에게 받은 값</small></span>
+          <span class="pair"><input type="password" id="token" spellcheck="false" autocomplete="off"><button type="button" id="token-show" class="ghost sm">보기</button></span></label>
+        <label class="row"><span class="lb">서버 ID</span>
+          <input type="text" id="guild-id" inputmode="numeric" spellcheck="false"></label>
+        <label class="row"><span class="lb">채팅 채널 ID<small>여러 개면 쉼표로 구분, 보내기는 첫 번째 채널</small></span>
+          <input type="text" id="channel-ids" spellcheck="false"></label>
+        <p class="note" id="voice-note">음성은 내가 들어가 있는 채널을 자동으로 따라감.</p>
       </div>
     </section>
 
     <section>
-      <h2>배치</h2>
-      <p class="hint">상자를 끌어서 옮기고, 오른쪽 아래 모서리로 크기를 조절함. 다른 모니터로 끌어 놓으면 그 모니터로 이동함. 실제 화면에도 바로 반영됨.</p>
+      <header><h2>모니터</h2></header>
+      <div class="rows">
+        <label class="row"><span class="lb">메인 모니터<small>게임 화면</small></span><select id="mon-main"></select></label>
+        <label class="row"><span class="lb">서브 모니터<small>유튜브 화면</small></span><select id="mon-sub"></select></label>
+      </div>
+    </section>
+
+    <section>
+      <header><h2>배치</h2><button id="reset" type="button" class="ghost sm">기본 배치로</button></header>
+      <p class="note">상자를 끌어서 옮기고 오른쪽 아래 모서리로 크기를 조절함. 다른 모니터로 끌어 놓으면 그 모니터로 옮겨짐. 실제 화면에도 바로 보임.</p>
       <div id="stage" class="stage"></div>
       <div class="toggles">
         <label><input type="checkbox" id="en-chat"> 채팅</label>
-        <label><input type="checkbox" id="en-media"> 미디어</label>
+        <label><input type="checkbox" id="en-media"> 사진·영상</label>
         <label><input type="checkbox" id="en-voice"> 음성</label>
-        <button id="reset" type="button" class="ghost">기본 배치로</button>
       </div>
     </section>
 
     <section>
-      <h2>표시</h2>
-      <div class="grid2">
-        <label>채팅 사라지는 시간
+      <header><h2>채팅</h2></header>
+      <div class="rows">
+        <label class="row"><span class="lb">사라지는 시간</span>
           <select id="chat-fade">
-            <option value="5">5초</option>
-            <option value="10">10초</option>
-            <option value="15">15초</option>
-            <option value="0">사라지지 않음</option>
-          </select>
-        </label>
-        <label>채팅 최대 줄 수
-          <input type="number" id="chat-lines" min="1" max="15" step="1">
-        </label>
-        <label>미디어 사라지는 시간 <output id="media-fade-out"></output>
-          <input type="range" id="media-fade" min="5" max="10" step="1">
-        </label>
-        <label>입력 모드 단축키
-          <input type="text" id="hotkey" readonly>
-        </label>
+            <option value="5">5초</option><option value="10">10초</option><option value="15">15초</option><option value="30">30초</option><option value="0">사라지지 않음</option>
+          </select></label>
+        <label class="row"><span class="lb">최대 줄 수</span>
+          <span class="range"><input type="range" id="chat-lines" min="3" max="15" step="1"><output id="chat-lines-out"></output></span></label>
+        <label class="row"><span class="lb">글자 크기</span>
+          <span class="range"><input type="range" id="chat-font" min="12" max="24" step="1"><output id="chat-font-out"></output></span></label>
+        <label class="row"><span class="lb">입력 단축키</span><input type="text" id="hotkey" readonly></label>
+      </div>
+    </section>
+
+    <section>
+      <header><h2>사진·영상</h2></header>
+      <div class="rows">
+        <label class="row"><span class="lb">한 번에 보일 개수</span>
+          <span class="range"><input type="range" id="media-max" min="1" max="3" step="1"><output id="media-max-out"></output></span></label>
+        <label class="row"><span class="lb">사라지는 시간</span>
+          <span class="range"><input type="range" id="media-fade" min="5" max="10" step="1"><output id="media-fade-out"></output></span></label>
+      </div>
+    </section>
+
+    <section>
+      <header><h2>음성</h2></header>
+      <div class="rows">
+        <label class="row"><span class="lb">크기</span>
+          <span class="range"><input type="range" id="voice-scale" min="0.8" max="2" step="0.05"><output id="voice-scale-out"></output></span></label>
+        <label class="row"><span class="lb">줄 간격</span>
+          <span class="range"><input type="range" id="voice-gap" min="0" max="20" step="1"><output id="voice-gap-out"></output></span></label>
+        <label class="row"><span class="lb">내 상태와 설정 버튼 표시</span><input type="checkbox" id="voice-controls" class="switch"></label>
+      </div>
+    </section>
+
+    <section>
+      <header><h2>공통</h2></header>
+      <div class="rows">
+        <label class="row"><span class="lb">말풍선 배경 진하기<small>0%면 글자만 보임</small></span>
+          <span class="range"><input type="range" id="bg-opacity" min="0" max="0.9" step="0.05"><output id="bg-opacity-out"></output></span></label>
       </div>
     </section>
   </main>
 
   <footer>
-    <span id="status" class="hint"></span>
-    <button id="cancel" type="button" class="ghost">취소</button>
+    <span id="status" class="saved"></span>
+    <button id="cancel" type="button" class="ghost">닫기</button>
     <button id="save" type="button" class="primary">저장</button>
   </footer>
   <script src="settings.js"></script>

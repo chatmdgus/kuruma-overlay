@@ -7,9 +7,15 @@
 </head>
 <body data-name="음성">
   <div class="voice" id="voice">
-    <div class="offline" id="offline">서버 연결 끊김</div>
-    <div id="members"></div>
+    <div class="bar plate" id="bar">
+      <span class="me-state" id="me-mic" title="마이크 상태 (디스코드에서 바꿀 수 있음)"></span>
+      <span class="me-state" id="me-deaf" title="스피커 상태 (디스코드에서 바꿀 수 있음)"></span>
+      <button type="button" class="gear" id="gear" title="오버레이 설정"></button>
+    </div>
+    <div class="status plate" id="status"><i></i><span></span></div>
+    <div class="vlist" id="list"></div>
   </div>
+  <script src="common.js"></script>
   <script src="voice.js"></script>
 </body>
 </html>

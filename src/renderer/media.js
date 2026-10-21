@@ -1,15 +1,16 @@
+// 최대 maxItems장을 동시에 쌓아서 보여주고, 각각 fadeSec 뒤 사라짐. 넘치면 대기열
 const stage = document.getElementById('stage');
 const queue = [];
-let showing = false;
-let settings = { fadeSec: 8 };
+let settings = { fadeSec: 8, maxItems: 3 };
 
-function next() {
-  const item = queue.shift();
-  if (!item) { showing = false; return; }
-  showing = true;
+function applySettings() {
+  stage.style.setProperty('--n', settings.maxItems);
+  pump();
+}
 
+function show(item) {
   const el = document.createElement(item.kind === 'video' ? 'video' : 'img');
-  el.className = 'fade';
+  el.className = 'item fade';
   el.src = item.url;
   if (item.kind === 'video') {
     el.muted = true;
@@ -17,20 +18,25 @@ function next() {
     el.loop = true;
     el.playsInline = true;
   }
-  el.onerror = () => { el.remove(); next(); };
-  stage.replaceChildren(el);
-
+  const done = () => { el.remove(); pump(); };
+  el.onerror = done;
+  stage.appendChild(el);
   setTimeout(() => {
     el.classList.add('gone');
-    setTimeout(() => { el.remove(); next(); }, 500);
+    setTimeout(done, 500);
   }, settings.fadeSec * 1000);
 }
 
-window.overlay.on('settings', (s) => { settings = { ...settings, ...s }; });
-window.overlay.on('media', (item) => {
-  if (queue.length >= 10) queue.shift();
-  queue.push(item);
-  if (!showing) next();
-});
+function pump() {
+  while (queue.length && stage.children.length < settings.maxItems) show(queue.shift());
+}
 
-window.overlay.on('edit-mode', (on) => document.body.classList.toggle('editing', on));
+window.overlay.on('settings', (s) => { settings = { ...settings, ...s }; applySettings(); });
+window.overlay.on('media', (item) => {
+  if (queue.length >= 12) queue.shift();
+  queue.push(item);
+  pump();
+});
+window.overlay.on('reset', () => { queue.length = 0; stage.replaceChildren(); });
+
+applySettings();

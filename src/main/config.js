@@ -8,10 +8,11 @@ const DEFAULTS = {
   sessionToken: '',
   subscribe: { guildId: '', channelIds: [], voiceChannelIds: [] },
   monitors: { main: null, sub: null },
+  appearance: { bgOpacity: 0.45 },
   overlays: {
-    chat: { enabled: true, monitor: 'sub', rect: { x: 0.78, y: 0.6, w: 0.2, h: 0.36 }, fadeSec: 10, maxLines: 5 },
-    media: { enabled: true, monitor: 'sub', rect: { x: 0.56, y: 0.6, w: 0.2, h: 0.36 }, fadeSec: 8 },
-    voice: { enabled: true, monitor: 'main', rect: { x: 0.01, y: 0.02, w: 0.13, h: 0.3 } },
+    chat: { enabled: true, monitor: 'sub', rect: { x: 0.74, y: 0.34, w: 0.245, h: 0.62 }, fadeSec: 10, maxLines: 8, fontSize: 15 },
+    media: { enabled: true, monitor: 'sub', rect: { x: 0.505, y: 0.34, w: 0.225, h: 0.62 }, fadeSec: 8, maxItems: 3 },
+    voice: { enabled: true, monitor: 'main', rect: { x: 0.008, y: 0.015, w: 0.15, h: 0.42 }, scale: 1.2, gap: 6, showControls: true },
   },
   hotkeys: { input: 'CommandOrControl+Shift+D' },
 };
@@ -46,4 +47,4 @@ function save(next) {
   return cache;
 }
 
-module.exports = { get, save, merge, DEFAULTS };
+module.exports = { get, save, merge, DEFAULTS, file };

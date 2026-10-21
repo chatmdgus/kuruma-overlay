@@ -1,15 +1,17 @@
-const { app, screen, globalShortcut, ipcMain } = require('electron');
+const { app, screen, globalShortcut, ipcMain, BrowserWindow } = require('electron');
 const path = require('path');
 const config = require('./config');
 const { makeOverlay, placeOverlay } = require('./overlay');
 const { startRelay } = require('./relay');
 const { startMock } = require('./mock');
-const { setupSettings, openSettings } = require('./settings');
+const { setupSettings, openSettings, notifySettings } = require('./settings');
 const { createTray } = require('./tray');
 
+const MOCK = process.argv.includes('--mock');
 const wins = {};
 let feed = null;
-let tray = null;
+let feedKey = '';
+let connection = { state: 'setup' };
 let inputMode = false;
 let userHidden = false;
 let registeredHotkey = null;
@@ -35,9 +37,11 @@ function layoutAll(cfg = config.get()) {
 }
 
 function sendSettings(cfg = config.get()) {
-  const { overlays } = cfg;
-  wins.chat.webContents.send('settings', { fadeSec: overlays.chat.fadeSec, maxLines: overlays.chat.maxLines });
-  wins.media.webContents.send('settings', { fadeSec: overlays.media.fadeSec });
+  const { overlays, appearance } = cfg;
+  const bgOpacity = appearance.bgOpacity;
+  wins.chat.webContents.send('settings', { fadeSec: overlays.chat.fadeSec, maxLines: overlays.chat.maxLines, fontSize: overlays.chat.fontSize, bgOpacity });
+  wins.media.webContents.send('settings', { fadeSec: overlays.media.fadeSec, maxItems: overlays.media.maxItems });
+  wins.voice.webContents.send('settings', { scale: overlays.voice.scale, gap: overlays.voice.gap, showControls: overlays.voice.showControls, bgOpacity });
 }
 
 function registerHotkey(cfg = config.get()) {
@@ -46,10 +50,30 @@ function registerHotkey(cfg = config.get()) {
   registeredHotkey = globalShortcut.register(cfg.hotkeys.input, () => setInputMode(!inputMode)) ? cfg.hotkeys.input : null;
 }
 
+function setConnection(c) {
+  connection = c;
+  for (const w of Object.values(wins)) w.webContents.send('connection', c);
+  notifySettings('connection', c);
+}
+
+// 접속 정보가 바뀌었을 때만 다시 연결
+function startFeed(cfg = config.get()) {
+  const key = MOCK ? 'mock' : JSON.stringify([cfg.serverUrl, cfg.sessionToken, cfg.subscribe]);
+  if (feed && key === feedKey) return;
+  feed && feed.stop();
+  feed = null;
+  feedKey = key;
+  for (const w of Object.values(wins)) w.webContents.send('reset');
+  if (MOCK) feed = startMock(emit);
+  else if (cfg.serverUrl && cfg.sessionToken) feed = startRelay(cfg, emit);
+  else setConnection({ state: 'setup' });
+}
+
 function applyConfig(cfg) {
   layoutAll(cfg);
   sendSettings(cfg);
   registerHotkey(cfg);
+  startFeed(cfg);
 }
 
 function setEditMode(on) {
@@ -73,7 +97,8 @@ function emit(type, payload) {
       wins.chat.webContents.send('message', {
         id: payload.id,
         author: payload.author,
-        text: payload.content || (media.length ? `[${media[0].kind === 'video' ? '영상' : '이미지'}]` : ''),
+        text: payload.content || (media.length ? (media[0].kind === 'video' ? '영상을 보냄' : '사진을 보냄') : ''),
+        mediaOnly: !payload.content && media.length > 0,
       });
       for (const m of media) wins.media.webContents.send('media', m);
       break;
@@ -88,7 +113,7 @@ function emit(type, payload) {
       wins.voice.webContents.send('voice', payload.members || []);
       break;
     case 'connection':
-      wins.voice.webContents.send('connection', payload.online);
+      setConnection(payload);
       break;
     default:
       break;
@@ -98,8 +123,14 @@ function emit(type, payload) {
 const settingsDeps = {
   config,
   resolveDisplay: (role) => resolveDisplay(role),
+  getConnection: () => connection,
+  isMock: () => MOCK,
   applyConfig,
-  previewConfig: (partial) => layoutAll(config.merge(config.get(), partial)),
+  previewConfig: (partial) => {
+    const merged = config.merge(config.get(), partial);
+    layoutAll(merged);
+    sendSettings(merged);
+  },
   setEditMode,
 };
 
@@ -110,9 +141,10 @@ app.whenReady().then(() => {
 
   Promise.all(Object.values(wins).map((w) => new Promise((r) => w.webContents.once('did-finish-load', r)))).then(() => {
     sendSettings();
+    startFeed();
     const cfg = config.get();
-    feed = process.argv.includes('--mock') || !cfg.serverUrl ? startMock(emit) : startRelay(cfg, emit);
-    if (!cfg.monitors.main) openSettings(settingsDeps); // 첫 실행: 모니터부터 정하게 함
+    // 첫 실행이거나 접속 정보가 없으면 설정 창부터
+    if (!cfg.monitors.main || (!MOCK && !(cfg.serverUrl && cfg.sessionToken))) openSettings(settingsDeps);
   });
 
   setupSettings(settingsDeps);
@@ -127,7 +159,7 @@ app.whenReady().then(() => {
   // 게임이 항상 위를 가로채는 경우 대비
   setInterval(() => Object.values(wins).forEach((w) => w.setAlwaysOnTop(true, 'screen-saver')), 5000);
 
-  tray = createTray({
+  createTray({
     onToggle: (visible) => { userHidden = !visible; if (userHidden) setInputMode(false); layoutAll(); },
     onSettings: () => openSettings(settingsDeps),
     onQuit: () => app.quit(),
@@ -139,6 +171,13 @@ app.whenReady().then(() => {
     setInputMode(false);
   });
   ipcMain.on('end-input', () => setInputMode(false));
+  ipcMain.on('open-settings', () => openSettings(settingsDeps));
+  // 설정 버튼 위에 마우스가 있는 동안만 클릭을 받음 (채팅 입력 모드 중인 채팅 창은 건드리지 않음)
+  ipcMain.on('set-clickable', (e, on) => {
+    const win = BrowserWindow.fromWebContents(e.sender);
+    if (!win || (win === wins.chat && inputMode)) return;
+    win.setIgnoreMouseEvents(!on, { forward: true });
+  });
 });
 
 app.on('second-instance', () => openSettings(settingsDeps));

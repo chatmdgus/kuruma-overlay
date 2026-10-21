@@ -39,7 +39,7 @@ function startMock(emit) {
     });
   }, 6000);
 
-  emit('connection', { online: true });
+  emit('connection', { state: 'online', mock: true, user: { id: '0', name: 'チャ' } });
 
   return {
     send(content) {

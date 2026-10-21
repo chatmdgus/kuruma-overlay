@@ -7,14 +7,17 @@
 
 ## 실행
 
-```bash
-npm install
-npm run mock   # 서버 없이 가짜 데이터로 화면 확인
-npm start      # config.json의 serverUrl로 접속 (비어 있으면 mock으로 동작)
+```powershell
+npm.cmd install
+npm.cmd run mock   # 서버 없이 가짜 데이터로 화면 확인
+npm.cmd start      # 실제 서버에 접속. 서버 주소·토큰·채널은 설정 창에서 입력
 ```
 
+PowerShell 실행 정책 때문에 `npm` 대신 `npm.cmd`를 씀.
+
 - 입력 모드: `Ctrl+Shift+D` → 입력 후 Enter 전송, Esc 취소
-- 설정 파일: `%APPDATA%/kuruma-overlay/config.json` (모니터, 오버레이 위치, 사라지는 시간)
+- 설정: 트레이 아이콘 또는 음성 오버레이의 톱니바퀴 → 연결, 모니터, 배치, 글자 크기, 배경 진하기 등
+- 설정 파일: `%APPDATA%/kuruma-overlay/config.json`
 
 ## 구조
 
@@ -25,12 +28,12 @@ src/
     overlay.js   투명·항상 위·클릭 통과 창
     config.js    설정 기본값과 저장
     relay.js     중계 서버 WebSocket 클라이언트
-    mock.js      개발용 가짜 데이터
+    mock.js      개발용 가짜 데이터 (--mock 일 때만)
     settings.js  설정 창, 배치 미리보기
     tray.js      트레이 메뉴
   preload.js
   settings-preload.js
-  renderer/      chat / media / voice 오버레이, settings 설정 창
+  renderer/      chat / media / voice 오버레이, settings 설정 창, common.js 공용(아바타·아이콘·연결 상태)
 docs/DESIGN.md
 ```
 

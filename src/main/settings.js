@@ -13,7 +13,11 @@ function displaysInfo() {
   }));
 }
 
-// deps: { config, resolveDisplay, applyConfig(cfg), previewConfig(cfg), setEditMode(on) }
+function notifySettings(channel, data) {
+  if (win && !win.isDestroyed()) win.webContents.send(channel, data);
+}
+
+// deps: { config, resolveDisplay, getConnection, isMock, applyConfig(cfg), previewConfig(cfg), setEditMode(on) }
 function setupSettings(deps) {
   ipcMain.handle('settings:get', () => {
     const cfg = deps.config.get();
@@ -22,6 +26,8 @@ function setupSettings(deps) {
       defaults: deps.config.DEFAULTS,
       displays: displaysInfo(),
       resolved: { main: String(deps.resolveDisplay('main').id), sub: String(deps.resolveDisplay('sub').id) },
+      connection: deps.getConnection(),
+      mock: deps.isMock(),
     };
   });
 
@@ -42,13 +48,13 @@ function setupSettings(deps) {
 function openSettings(deps) {
   if (win) { win.show(); win.focus(); return win; }
   win = new BrowserWindow({
-    width: 820,
-    height: 760,
-    minWidth: 640,
-    minHeight: 560,
+    width: 880,
+    height: 820,
+    minWidth: 680,
+    minHeight: 600,
     title: 'Kuruma Overlay 설정',
     autoHideMenuBar: true,
-    backgroundColor: '#1e1f22',
+    backgroundColor: '#15171c',
     webPreferences: {
       preload: path.join(__dirname, '..', 'settings-preload.js'),
       contextIsolation: true,
@@ -65,4 +71,4 @@ function openSettings(deps) {
   return win;
 }
 
-module.exports = { setupSettings, openSettings };
+module.exports = { setupSettings, openSettings, notifySettings };
