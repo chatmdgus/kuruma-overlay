@@ -1,4 +1,4 @@
-const { app, screen, globalShortcut, ipcMain, BrowserWindow } = require('electron');
+const { app, screen, globalShortcut, ipcMain, BrowserWindow, safeStorage } = require('electron');
 const path = require('path');
 
 // 개발 실행(npm start)과 설치본이 같은 설정 폴더를 쓰게 고정
@@ -10,6 +10,7 @@ const { startMock } = require('./mock');
 const { setupSettings, openSettings, notifySettings } = require('./settings');
 const { createTray } = require('./tray');
 const { startTunnel } = require('./tunnel');
+const { login, describeLoginError } = require('./login');
 
 const MOCK = process.argv.includes('--mock');
 const wins = {};
@@ -17,6 +18,7 @@ let feed = null;
 let feedKey = '';
 let connection = { state: 'setup' };
 const channelNames = new Map();   // 채널 ID → 이름 (서버의 ready 메시지에서 받음)
+let sendChannelId = null;         // 오버레이에서 쓴 글을 보낼 채널
 let tunnel = null;
 let tunnelKey = '';
 let tunnelState = { state: 'off' };
@@ -86,10 +88,26 @@ function syncLaunch(cfg = config.get()) {
   app.setLoginItemSettings({ openAtLogin: !!cfg.launch.atLogin, path: process.execPath, args: app.isPackaged ? [] : [app.getAppPath()] });
 }
 
+// 세션 키는 Windows 사용자 계정으로 암호화해서 저장
+function sealSession(token) {
+  if (!token) return '';
+  return safeStorage.isEncryptionAvailable() ? `enc:${safeStorage.encryptString(token).toString('base64')}` : `raw:${token}`;
+}
+function openSession(sealed) {
+  if (!sealed) return '';
+  try {
+    if (sealed.startsWith('enc:')) return safeStorage.decryptString(Buffer.from(sealed.slice(4), 'base64'));
+    if (sealed.startsWith('raw:')) return sealed.slice(4);
+  } catch { /* 다른 PC에서 옮겨온 설정이면 복호화 안 됨 */ }
+  return '';
+}
+const authTokenOf = (cfg) => openSession(cfg.auth?.session) || cfg.sessionToken || '';
+
 // 접속 정보가 바뀌었을 때만 다시 연결
 function startFeed(cfg = config.get()) {
   const url = serverUrlOf(cfg);
-  const key = MOCK ? 'mock' : JSON.stringify([url, cfg.sessionToken, cfg.subscribe]);
+  const token = authTokenOf(cfg);
+  const key = MOCK ? 'mock' : JSON.stringify([url, token, cfg.subscribe]);
   // 같은 정보라도 토큰 오류로 멈춘 상태면 저장할 때 다시 시도
   if (feed && key === feedKey && connection.state !== 'error') return;
   feed && feed.stop();
@@ -98,7 +116,7 @@ function startFeed(cfg = config.get()) {
   for (const w of Object.values(wins)) w.webContents.send('reset');
   channelNames.clear();
   if (MOCK) feed = startMock(emit);
-  else if (url && cfg.sessionToken) feed = startRelay({ ...cfg, serverUrl: url }, emit);
+  else if (url && token) feed = startRelay({ ...cfg, serverUrl: url, sessionToken: token }, emit);
   else setConnection({ state: 'setup' });
 }
 
@@ -125,10 +143,10 @@ function setInputMode(on) {
   chat.webContents.send('input-mode', on);
 }
 
-// 입력창에 "어느 채널로 보내는지" 표시
+// 입력창에 "어느 채널로 보내는지" 표시. 채널을 따로 정하지 않았으면 볼 수 있는 첫 채팅 채널
 function sendTarget(cfg = config.get()) {
-  const id = MOCK ? 'mock' : cfg.subscribe.channelIds[0];
-  wins.chat.webContents.send('target', channelNames.get(id) || null);
+  sendChannelId = MOCK ? 'mock' : (cfg.subscribe.channelIds[0] || [...channelNames.keys()][0] || null);
+  wins.chat.webContents.send('target', channelNames.get(sendChannelId) || null);
 }
 
 function emit(type, payload) {
@@ -147,7 +165,7 @@ function emit(type, payload) {
     }
     case 'ready': {
       channelNames.clear();
-      for (const g of payload.guilds || []) for (const c of g.channels || []) channelNames.set(c.id, c.name);
+      for (const g of payload.guilds || []) for (const c of g.channels || []) if (c.type !== 'voice') channelNames.set(c.id, c.name);
       sendTarget();
       break;
     }
@@ -161,6 +179,8 @@ function emit(type, payload) {
       wins.voice.webContents.send('voice', { channelName: payload.channelName || null, members: payload.members || [] });
       break;
     case 'connection':
+      // 디스코드 로그인 세션이 거부되면 만료로 안내
+      if (payload.state === 'error' && payload.reason === 'auth_failed' && config.get().auth?.session) payload = { ...payload, reason: 'expired' };
       setConnection(payload);
       break;
     default:
@@ -181,6 +201,27 @@ const settingsDeps = {
     sendSettings(merged);
   },
   setEditMode,
+  // 처음 설정 화면의 "디스코드로 로그인"
+  async login(partial) {
+    const cfg = config.save(partial);
+    applyConfig(cfg);
+    // SSH 터널을 쓰면 열릴 때까지 잠깐 기다림
+    for (let i = 0; cfg.ssh.enabled && tunnelState.state !== 'open' && i < 30; i++) await new Promise((r) => setTimeout(r, 500));
+    try {
+      const { token, user } = await login(serverUrlOf(cfg));
+      const next = config.save({ auth: { session: sealSession(token), user: { id: user.id, name: user.name } } });
+      applyConfig(next);
+      return { ok: true, user };
+    } catch (e) {
+      return { ok: false, error: describeLoginError(e) };
+    }
+  },
+  logout() {
+    feed && feed.logout && feed.logout();
+    const next = config.save({ auth: { session: '', user: null } });
+    applyConfig(next);
+    return true;
+  },
 };
 
 app.whenReady().then(() => {
@@ -195,7 +236,7 @@ app.whenReady().then(() => {
     startFeed();
     const cfg = config.get();
     // 첫 실행이거나 접속 정보가 없으면 설정 창부터
-    if (!cfg.monitors.main || (!MOCK && !(serverUrlOf(cfg) && cfg.sessionToken))) openSettings(settingsDeps);
+    if (!cfg.monitors.main || (!MOCK && !(serverUrlOf(cfg) && authTokenOf(cfg)))) openSettings(settingsDeps);
   });
 
   setupSettings(settingsDeps);
@@ -218,7 +259,7 @@ app.whenReady().then(() => {
 
   ipcMain.on('send', (_e, content) => {
     const text = String(content || '').trim().slice(0, 2000);
-    if (text && feed) feed.send(text);
+    if (text && feed && sendChannelId) feed.send(text, sendChannelId);
     setInputMode(false);
   });
   ipcMain.on('end-input', () => setInputMode(false));

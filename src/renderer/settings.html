@@ -15,28 +15,38 @@
       <p class="lead">한 번만 입력하면 됨. 나중에 바꾸려면 설정 창 위쪽의 연결 설정을 누르면 됨.</p>
 
       <section>
-        <header><h2>서버 연결</h2><span class="pill" id="conn"><i></i><span></span></span></header>
+        <header><h2>서버</h2><span class="pill" id="conn"><i></i><span></span></span></header>
         <div class="rows">
-          <label class="row"><span class="lb">토큰<small>서버 주인에게 받은 값</small></span>
-            <span class="pair"><input type="password" id="token" spellcheck="false" autocomplete="off"><button type="button" id="token-show" class="ghost sm">보기</button></span></label>
-          <label class="row"><span class="lb">서버 ID</span><input type="text" id="guild-id" inputmode="numeric" spellcheck="false"></label>
-          <label class="row"><span class="lb">채팅 채널 ID<small>여러 개면 쉼표로 구분</small></span><input type="text" id="channel-ids" spellcheck="false"></label>
-          <label class="row"><span class="lb">서버 주소<small>SSH 터널을 쓰면 비워둠</small></span><input type="text" id="server-url" placeholder="wss://…" spellcheck="false"></label>
+          <label class="row"><span class="lb">서버 주소<small>서버 주인에게 받은 주소. SSH 터널을 쓰면 비워둠</small></span><input type="text" id="server-url" placeholder="wss://…" spellcheck="false"></label>
+          <div class="row"><span class="lb">앱에서 SSH 터널 열기<small>서버 주인만 해당</small></span><span class="seg" id="ssh-on"></span></div>
+          <div id="ssh-fields">
+            <div class="row sub"><span class="lb">SSH 상태</span><span class="pill" id="tunnel"><i></i><span></span></span></div>
+            <label class="row sub"><span class="lb">서버 IP</span><input type="text" id="ssh-host" placeholder="서버 IP 주소" spellcheck="false"></label>
+            <label class="row sub"><span class="lb">사용자</span><input type="text" id="ssh-user" placeholder="ubuntu" spellcheck="false"></label>
+            <label class="row sub"><span class="lb">키 파일</span>
+              <span class="pair"><input type="text" id="ssh-key" placeholder="키 파일 위치" spellcheck="false"><button type="button" id="ssh-pick" class="ghost sm">찾기</button></span></label>
+            <label class="row sub"><span class="lb">포트</span><input type="text" id="ssh-port" inputmode="numeric" placeholder="8790"></label>
+          </div>
         </div>
       </section>
 
       <section>
-        <header><h2>SSH 터널</h2><span class="pill" id="tunnel"><i></i><span></span></span></header>
-        <div class="rows">
-          <div class="row"><span class="lb">앱에서 SSH 터널 열기<small>서버 주인만 해당</small></span><span class="seg" id="ssh-on"></span></div>
-          <div id="ssh-fields">
-            <label class="row"><span class="lb">서버 IP</span><input type="text" id="ssh-host" placeholder="서버 IP 주소" spellcheck="false"></label>
-            <label class="row"><span class="lb">사용자</span><input type="text" id="ssh-user" placeholder="ubuntu" spellcheck="false"></label>
-            <label class="row"><span class="lb">키 파일</span>
-              <span class="pair"><input type="text" id="ssh-key" placeholder="키 파일 위치" spellcheck="false"><button type="button" id="ssh-pick" class="ghost sm">찾기</button></span></label>
-            <label class="row"><span class="lb">포트</span><input type="text" id="ssh-port" inputmode="numeric" placeholder="8790"></label>
-          </div>
+        <header><h2>디스코드 계정</h2></header>
+        <div class="account" id="account">
+          <div class="who" id="who"><span class="av" id="who-av"></span><span><b id="who-name"></b><small>로그인됨</small></span></div>
+          <button type="button" id="login" class="discord">디스코드로 로그인</button>
+          <button type="button" id="logout" class="ghost sm" hidden>로그아웃</button>
         </div>
+        <p class="note" id="login-msg">브라우저에서 디스코드 승인 화면이 열려요. 승인하면 자동으로 연결돼요.</p>
+
+        <details class="adv" id="adv">
+          <summary>고급: 토큰·채널 직접 지정</summary>
+          <div class="rows">
+            <label class="row"><span class="lb">토큰<small>디스코드 로그인 대신 쓰는 임시 방식</small></span>
+              <span class="pair"><input type="password" id="token" spellcheck="false" autocomplete="off"><button type="button" id="token-show" class="ghost sm">보기</button></span></label>
+            <label class="row"><span class="lb">채팅 채널 ID<small>비우면 볼 수 있는 채널 전부. 여러 개면 쉼표로</small></span><input type="text" id="channel-ids" spellcheck="false"></label>
+          </div>
+        </details>
       </section>
 
       <section>

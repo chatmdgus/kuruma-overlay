@@ -74,13 +74,14 @@ const splitIds = (v) => v.split(/[,\s]+/).map((x) => x.trim()).filter(Boolean);
 function fillSetup() {
   $('server-url').value = state.serverUrl || '';
   $('token').value = state.sessionToken || '';
-  $('guild-id').value = state.subscribe?.guildId || '';
   $('channel-ids').value = (state.subscribe?.channelIds || []).join(', ');
   $('token-show').onclick = () => {
     const t = $('token');
     t.type = t.type === 'password' ? 'text' : 'password';
     $('token-show').textContent = t.type === 'password' ? '보기' : '숨기기';
   };
+  // 예전 방식(토큰·채널)을 쓰고 있으면 고급 칸을 펼쳐 둠
+  $('adv').open = !!(state.sessionToken || state.subscribe?.channelIds?.length);
 
   const s = state.ssh;
   $('ssh-host').value = s.host || '';
@@ -96,30 +97,78 @@ function fillSetup() {
     bindSeg(`mon-${role}`, displays.map((d, i) => ({ label: `${i + 1}번 ${d.bounds.width}×${d.bounds.height}${d.primary ? ' (주)' : ''}`, value: d.id })),
       () => String(roleId(role)), (v) => { state.monitors[role] = v; render(); }, { live: true });
   }
+
+  $('login').onclick = doLogin;
+  $('logout').onclick = async () => {
+    await window.settingsApi.logout();
+    state.auth = { session: '', user: null };
+    paintAccount();
+  };
+  paintAccount();
+}
+
+// 디스코드 계정 칸: 로그인 상태 표시
+function paintAccount(msg, bad) {
+  const user = state.auth?.user;
+  $('who').hidden = !user;
+  $('logout').hidden = !user;
+  $('login').hidden = !!user;
+  if (user) {
+    $('who-name').textContent = user.name;
+    $('who-av').textContent = (user.name || '?').slice(0, 1);
+  }
+  $('login-msg').textContent = msg || (user ? '다른 계정으로 바꾸려면 로그아웃하고 다시 로그인하세요.' : '브라우저에서 디스코드 승인 화면이 열려요. 승인하면 자동으로 연결돼요.');
+  $('login-msg').classList.toggle('bad', !!bad);
+}
+
+function serverProblem() {
+  if (state.ssh.enabled) {
+    if (!state.ssh.host) return 'SSH 서버 IP를 입력하세요';
+    if (!state.ssh.keyPath) return 'SSH 키 파일을 지정하세요';
+  } else if (!/^wss?:\/\//.test(state.serverUrl)) {
+    return '서버 주소는 ws:// 또는 wss:// 로 시작해야 해요';
+  }
+  return '';
+}
+
+async function doLogin() {
+  readSetup();
+  const problem = serverProblem();
+  if (problem) { paintAccount(problem, true); return; }
+  const btn = $('login');
+  btn.disabled = true;
+  btn.classList.add('busy');
+  paintAccount('브라우저에서 디스코드 승인을 눌러 주세요…');
+  const res = await window.settingsApi.login({ serverUrl: state.serverUrl, ssh: state.ssh });
+  btn.disabled = false;
+  btn.classList.remove('busy');
+  if (res.ok) {
+    state.auth = { session: 'saved', user: { id: res.user.id, name: res.user.name } };
+    $('setup-msg').textContent = '';
+    paintAccount();
+    $('who').classList.remove('pop'); void $('who').offsetWidth; $('who').classList.add('pop');
+  } else {
+    paintAccount(res.error, true);
+  }
 }
 
 function readSetup() {
   const port = Math.round(Number($('ssh-port').value)) || 8790;
   state.serverUrl = $('server-url').value.trim();
   state.sessionToken = $('token').value.trim();
-  state.subscribe = { guildId: $('guild-id').value.trim(), channelIds: splitIds($('channel-ids').value), voiceChannelIds: [] };
+  state.subscribe = { guildId: '', channelIds: splitIds($('channel-ids').value), voiceChannelIds: [] };
   state.ssh = { ...state.ssh, host: $('ssh-host').value.trim(), user: $('ssh-user').value.trim() || 'ubuntu', keyPath: $('ssh-key').value.trim(), localPort: port, remotePort: port };
 }
 
 function setupProblem() {
-  if (!state.sessionToken) return '토큰을 입력하세요';
-  if (!/^\d{5,25}$/.test(state.subscribe.guildId)) return '서버 ID는 숫자여야 함';
-  if (!state.subscribe.channelIds.length || state.subscribe.channelIds.some((id) => !/^\d{5,25}$/.test(id))) return '채팅 채널 ID는 숫자여야 함';
-  if (state.ssh.enabled) {
-    if (!state.ssh.host) return 'SSH 서버 IP를 입력하세요';
-    if (!state.ssh.keyPath) return 'SSH 키 파일을 지정하세요';
-  } else if (!/^wss?:\/\//.test(state.serverUrl)) {
-    return '서버 주소는 ws:// 또는 wss:// 로 시작해야 함';
-  }
+  const server = serverProblem();
+  if (server) return server;
+  if (!state.auth?.user && !state.sessionToken) return '디스코드로 로그인해 주세요';
+  if (state.subscribe.channelIds.some((id) => !/^\d{5,25}$/.test(id))) return '채팅 채널 ID는 숫자여야 해요';
   return '';
 }
 
-const isConfigured = (cfg) => !!(cfg.sessionToken && (cfg.serverUrl || (cfg.ssh?.enabled && cfg.ssh.host && cfg.ssh.keyPath)) && cfg.monitors?.main);
+const isConfigured = (cfg) => !!((cfg.auth?.session || cfg.sessionToken) && (cfg.serverUrl || (cfg.ssh?.enabled && cfg.ssh.host && cfg.ssh.keyPath)) && cfg.monitors?.main);
 
 // ---------- 평소 설정 ----------
 function fillMain() {

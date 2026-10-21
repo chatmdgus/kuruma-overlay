@@ -30,17 +30,22 @@ function startRelay({ serverUrl, sessionToken, subscribe }, emit) {
       }
       emit(msg.type, msg);
     };
-    ws.onclose = (ev) => {
+    let handled = false;   // onerror·onclose가 둘 다 오는 경우가 있어서 한 번만 처리
+    const onDown = (code) => {
+      if (handled) return;
+      handled = true;
       clearInterval(pingTimer);
       if (stopped) return;
-      if (ev.code === 4001) {   // 토큰이 틀리면 재시도해도 소용없음
+      if (code === 4001) {   // 토큰이 틀리면 재시도해도 소용없음
         emit('connection', { state: 'error', reason: 'auth_failed' });
         return;
       }
       emit('connection', { state: 'offline' });
       setTimeout(() => { if (!stopped) connect(); }, Math.min(30000, 1000 * 2 ** retry++));
     };
-    ws.onerror = () => {};
+    ws.onclose = (ev) => onDown(ev.code);
+    // Node 내장 WebSocket은 접속이 거부되면 onclose 없이 onerror만 옴 → 이때도 다시 접속
+    ws.onerror = () => { if (ws.readyState !== WebSocket.OPEN) onDown(1006); };
   };
 
   connect();
@@ -49,6 +54,7 @@ function startRelay({ serverUrl, sessionToken, subscribe }, emit) {
     send(content, channelId = subscribe.channelIds[0]) {
       send({ type: 'send', channelId, content, nonce: String(++nonce) });
     },
+    logout() { send({ type: 'logout' }); },
     stop() { stopped = true; clearInterval(pingTimer); ws && ws.close(); },
   };
 }

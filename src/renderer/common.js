@@ -89,6 +89,7 @@ window.ui = (() => {
     connecting: '서버에 연결하는 중',
     offline: '연결이 끊김. 다시 연결하는 중',
     error: '토큰이 맞지 않음. 설정에서 확인하세요',
+    expired: '로그인이 만료됨. 설정에서 다시 로그인하세요',
   };
 
   function bindStatus(el, onChange) {
@@ -96,7 +97,7 @@ window.ui = (() => {
       const state = c?.state || 'setup';
       el.dataset.state = state;
       el.classList.toggle('on', state !== 'online');
-      el.lastChild.textContent = c?.reason === 'bad_url' ? '서버 주소가 올바르지 않음' : (STATUS_TEXT[state] || '');
+      el.lastChild.textContent = c?.reason === 'bad_url' ? '서버 주소가 올바르지 않음' : c?.reason === 'expired' ? STATUS_TEXT.expired : (STATUS_TEXT[state] || '');
       onChange && onChange(c);
     });
   }
