@@ -15,6 +15,9 @@ let lastTunnel = null;
 const clone = (o) => JSON.parse(JSON.stringify(o));
 const roleId = (role) => state.monitors[role] ?? resolved[role];
 const displayById = (id) => displays.find((d) => d.id === String(id)) || displays[0];
+// 세로 모니터에 놓인 오버레이는 rectTall에 따로 저장
+const rectKey = (o) => { const b = displayById(roleId(o.monitor)).bounds; return b.height > b.width ? 'rectTall' : 'rect'; };
+const rectOf = (name) => { const o = state.overlays[name]; return o[rectKey(o)] || defaults.overlays[name][rectKey(o)]; };
 
 // ---------- 버튼 묶음 (슬라이더·드롭다운 대신) ----------
 // options: [{ label, value }]. 숫자 값은 저장된 값과 가장 가까운 버튼을 켬
@@ -235,7 +238,8 @@ function rolesOf(d) {
 function overlayStageRect(name) {
   const o = state.overlays[name];
   const m = monitorBox(displayById(roleId(o.monitor)));
-  return { left: m.left + o.rect.x * m.width, top: m.top + o.rect.y * m.height, width: o.rect.w * m.width, height: o.rect.h * m.height };
+  const r = rectOf(name);
+  return { left: m.left + r.x * m.width, top: m.top + r.y * m.height, width: r.w * m.width, height: r.h * m.height };
 }
 
 function render() {
@@ -309,7 +313,7 @@ function commitRect(name, box, mode) {
   if (1 - (y + h) < SNAP) { if (mode === 'move') y = 1 - h; else h = 1 - y; }
 
   o.monitor = role;
-  o.rect = { x: round(x), y: round(y), w: round(w), h: round(h) };
+  o[rectKey(o)] = { x: round(x), y: round(y), w: round(w), h: round(h) };
 }
 
 const round = (v) => Math.round(v * 1000) / 1000;
@@ -393,6 +397,7 @@ $('reset').onclick = () => {
   for (const name of Object.keys(NAMES)) {
     state.overlays[name].monitor = defaults.overlays[name].monitor;
     state.overlays[name].rect = clone(defaults.overlays[name].rect);
+    state.overlays[name].rectTall = clone(defaults.overlays[name].rectTall);
   }
   render();
   preview();

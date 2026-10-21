@@ -51,7 +51,9 @@ function layoutAll(cfg = config.get()) {
     // 음성 오버레이는 쓰지 않음 (디스코드 기본 오버레이 사용)
     const hideForDiscord = discordFront && cfg.appearance.hideOnDiscord;
     if (!o.enabled || userHidden || hideForDiscord || name === 'voice') { win.hide(); continue; }
-    placeOverlay(win, resolveDisplay(o.monitor, cfg), o.rect);
+    const d = resolveDisplay(o.monitor, cfg);
+    const tall = d.bounds.height > d.bounds.width;
+    placeOverlay(win, d, tall ? (o.rectTall || config.DEFAULTS.overlays[name].rectTall) : o.rect);
     win.showInactive();
   }
 }
