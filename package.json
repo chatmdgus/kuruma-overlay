@@ -1,0 +1,22 @@
+{
+  "name": "kuruma-overlay",
+  "version": "0.1.0",
+  "private": true,
+  "description": "디스코드 클라이언트 없이 채팅·음성 참여자를 화면 오버레이로 보는 앱",
+  "main": "src/main/index.js",
+  "scripts": {
+    "start": "electron .",
+    "mock": "electron . --mock",
+    "dist": "electron-builder --win"
+  },
+  "devDependencies": {
+    "electron": "^40.0.0",
+    "electron-builder": "^26.0.0"
+  },
+  "build": {
+    "appId": "dev.kuruma.overlay",
+    "productName": "Kuruma Overlay",
+    "files": ["src/**/*", "package.json"],
+    "win": { "target": "nsis" }
+  }
+}
