@@ -25,7 +25,8 @@
     },
     "win": {
       "target": "nsis",
-      "signAndEditExecutable": false
+      "signAndEditExecutable": false,
+      "icon": "build/icon.ico"
     },
     "nsis": {
       "oneClick": true,
@@ -33,7 +34,9 @@
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "Kuruma Overlay",
-      "artifactName": "KurumaOverlay-Setup.${ext}"
+      "artifactName": "KurumaOverlay-Setup.${ext}",
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico"
     }
   }
 }

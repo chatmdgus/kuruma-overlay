@@ -65,6 +65,7 @@ function openSettings(deps) {
     minWidth: 680,
     minHeight: 600,
     title: 'Kuruma Overlay 설정',
+    icon: path.join(__dirname, '..', 'assets', 'icon.png'),
     autoHideMenuBar: true,
     backgroundColor: '#15171c',
     webPreferences: {
