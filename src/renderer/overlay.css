@@ -53,7 +53,31 @@ html, body {
   padding: 8px; box-sizing: border-box;
   font-size: var(--fs);
 }
-.list { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
+.list {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 6px;
+  min-height: 0; overflow-y: auto; scrollbar-width: none;   /* 스크롤은 휠로만, 스크롤바는 안 보임 */
+  overscroll-behavior: contain;
+}
+.list::-webkit-scrollbar { display: none; }
+.list > .msg { flex: none; }
+.list > .msg.old { display: none; }
+/* 입력 중: 지난 기록을 펼쳐 볼 때는 바탕을 조금 진하게 */
+.chat.typing .list > .msg { background: rgba(var(--plate), calc(var(--bg) + 0.25)); }
+.latest {
+  position: absolute; right: 14px; bottom: 3.6em; z-index: 2;
+  padding: 0.35em 0.9em; border-radius: 999px; border: 1px solid var(--edge);
+  font: inherit; font-size: 0.82em; font-weight: 700; color: var(--accent-ink); background: var(--accent);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35); cursor: pointer;
+  opacity: 0; transform: translateY(8px); pointer-events: none; transition: opacity 0.2s, transform 0.2s;
+}
+.latest.on { opacity: 1; transform: none; pointer-events: auto; }
+.latest.new::before { content: '새 메시지 · '; }
+.msg .link { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; cursor: pointer; word-break: break-all; }
+.msg .link:hover { filter: brightness(1.2); }
+.msg .mention { color: var(--accent); font-weight: 700; background: rgba(var(--accent-rgb), 0.14); border-radius: 0.3em; padding: 0 0.15em; }
+.msg.ping { box-shadow: inset 0 0 0 1.5px rgba(var(--accent-rgb), 0.8); }
+.mention-pick .item { align-items: center; }
+.mention-pick .item .av { width: 1.5em; height: 1.5em; font-size: 0.8em; }
 .msg {
   display: flex; align-items: flex-start; gap: 0.5em;
   width: fit-content; max-width: 100%; box-sizing: border-box;
@@ -117,10 +141,10 @@ html, body {
   display: flex; flex-direction: column; justify-content: flex-end; align-items: flex-end;
   gap: 8px; padding: 8px; box-sizing: border-box;
 }
+.media.row { flex-direction: row; align-items: flex-end; justify-content: flex-end; }
 .media .item {
-  display: block;
-  max-width: 100%;
-  max-height: calc((100% - (var(--n) - 1) * 8px) / var(--n));
+  display: block; flex: none;
+  max-width: 100%; max-height: 100%;
   object-fit: contain;
   border-radius: 12px;
   box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.14), 0 6px 20px rgba(0, 0, 0, 0.35);
@@ -271,7 +295,7 @@ body.editing::after {
 
 /* 내 GIF */
 .gif { position: fixed; inset: 0; display: grid; place-items: center; transition: opacity 0.25s; }
-.gif img { max-width: 100%; max-height: 100%; object-fit: contain; filter: drop-shadow(0 4px 14px rgba(0, 0, 0, 0.35)); }
+.gif img { width: 100%; height: 100%; object-fit: contain;   /* 맞춘 칸 크기에 꽉 차게 (비율 유지) */ filter: drop-shadow(0 4px 14px rgba(0, 0, 0, 0.35)); }
 .gif img.pop { animation: gif-pop 0.5s cubic-bezier(0.2, 1.4, 0.4, 1) both; }
 .gif-empty { display: none; color: var(--ink-soft); font-size: 13px; text-align: center; padding: 10px; }
 body.editing .gif-empty:not([hidden]) { display: block; }

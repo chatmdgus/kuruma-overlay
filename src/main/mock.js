@@ -47,6 +47,7 @@ function startMock(emit) {
     send(content) {
       emit('message', { id: String(++n), channelId: 'mock', author: { id: '0', name: 'チャ', color: '#EF9F27' }, content, media: [], ts: Date.now() });
     },
+    searchMembers: async (q) => people.filter((p) => p.name.startsWith(q)).map(({ id, name }) => ({ id, name, avatar: null })),
     stop() { clearInterval(msgTimer); clearInterval(voiceTimer); },
   };
 }

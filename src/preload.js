@@ -13,4 +13,6 @@ contextBridge.exposeInMainWorld('overlay', {
   endInput() { ipcRenderer.send('end-input'); },
   setTarget(id) { ipcRenderer.send('set-target', id || null); },
   fetchLottie(url) { return ipcRenderer.invoke('fetch-lottie', url); },
+  openLink(url) { ipcRenderer.send('open-link', url); },
+  searchMembers(q) { return ipcRenderer.invoke('search-members', q); },
 });

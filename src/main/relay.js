@@ -5,6 +5,7 @@ function startRelay({ serverUrl, sessionToken, subscribe }, emit) {
   let stopped = false;
   let nonce = 0;
   let pingTimer = null;
+  const pending = new Map();   // 멤버 찾기 요청 nonce → resolve
 
   const send = (obj) => ws && ws.readyState === WebSocket.OPEN && ws.send(JSON.stringify(obj));
 
@@ -24,6 +25,11 @@ function startRelay({ serverUrl, sessionToken, subscribe }, emit) {
     ws.onmessage = (ev) => {
       let msg;
       try { msg = JSON.parse(ev.data); } catch { return; }
+      if (msg.type === 'members' && pending.has(msg.nonce)) {
+        pending.get(msg.nonce)(Array.isArray(msg.members) ? msg.members : []);
+        pending.delete(msg.nonce);
+        return;
+      }
       if (msg.type === 'ready') {
         emit('connection', { state: 'online', user: msg.user });
         send({ type: 'subscribe', ...subscribe });
@@ -55,6 +61,15 @@ function startRelay({ serverUrl, sessionToken, subscribe }, emit) {
       send({ type: 'send', channelId, content, nonce: String(++nonce) });
     },
     logout() { send({ type: 'logout' }); },
+    // @멘션 자동완성: 이름으로 서버 멤버 찾기 (2초 안에 답 없으면 빈 목록)
+    searchMembers(query) {
+      const id = String(++nonce);
+      return new Promise((resolve) => {
+        pending.set(id, resolve);
+        send({ type: 'members', query, nonce: id });
+        setTimeout(() => { if (pending.has(id)) { pending.delete(id); resolve([]); } }, 2000);
+      });
+    },
     stop() { stopped = true; clearInterval(pingTimer); ws && ws.close(); },
   };
 }

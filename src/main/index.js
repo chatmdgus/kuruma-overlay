@@ -12,7 +12,8 @@ const { setupSettings, openSettings, notifySettings } = require('./settings');
 const { createTray } = require('./tray');
 const { startTunnel } = require('./tunnel');
 const { login, describeLoginError } = require('./login');
-const { watchForeground } = require('./foreground');
+const { watchForeground, foregroundWindow, restoreForeground, foregroundIsFullscreen } = require('./foreground');
+const { shell } = require('electron');
 const { setupUpdater } = require('./updater');
 
 const MOCK = process.argv.includes('--mock');
@@ -28,6 +29,7 @@ let channelList = [];             // 볼 수 있는 텍스트 채널 [{id, name}
 let tunnel = null;
 let tunnelKey = '';
 let tunnelState = { state: 'off' };
+let prevForeground = null;  // 입력을 시작하기 전 맨 앞 창 (끝나면 여기로 포커스를 돌려줌)
 let inputOn = true;        // 채팅 입력창이 보이는지 (단축키로 켜고 끔, 기본은 켜짐)
 let userHidden = false;
 let registeredHotkey = null;
@@ -192,19 +194,29 @@ function setInputOn(on, { focus = false, save = true } = {}) {
   inputOn = on;
   const chat = wins.chat;
   if (!chat || chat.isDestroyed()) return;
-  chat.setFocusable(on);
   if (!on) endTyping();
   post(chat, 'input-mode', { on, focus });
-  if (on && focus && !userHidden && config.get().overlays.chat.enabled) {
-    chat.setIgnoreMouseEvents(false);
-    chat.focus();
-  }
+  if (on && focus) startTyping();
   if (save) config.save({ overlays: { chat: { inputOn: on } } });
   notifySettings('input', on);
 }
 
+// 단축키: 꺼져 있으면 켜고 바로 입력 / 켜져 있는데 게임 중이면 바로 입력 / 입력 중이면 끄기
 function toggleInput() {
-  setInputOn(!inputOn, { focus: !inputOn });
+  const chat = wins.chat;
+  if (!inputOn) setInputOn(true, { focus: true });
+  else if (chat && !chat.isDestroyed() && !chat.isFocused()) { post(chat, 'input-mode', { on: true, focus: true }); startTyping(); }
+  else setInputOn(false);
+}
+
+// 입력 시작: 지금 맨 앞 창(게임)을 기억해 두고 채팅 창에 포커스
+function startTyping() {
+  const chat = wins.chat;
+  if (!chat || chat.isDestroyed() || userHidden || !config.get().overlays.chat.enabled) return;
+  if (!chat.isFocused()) prevForeground = foregroundWindow();
+  chat.setFocusable(true);
+  chat.setIgnoreMouseEvents(false);   // 입력 중에는 창 전체로 휠 스크롤·링크 클릭
+  chat.focus();
 }
 
 // 입력을 끝내면 게임으로 포커스를 돌려주고 다시 클릭 통과
@@ -212,7 +224,10 @@ function endTyping() {
   const chat = wins.chat;
   if (!chat || chat.isDestroyed()) return;
   chat.setIgnoreMouseEvents(true, { forward: true });
-  if (chat.isFocused()) chat.blur();
+  const hadFocus = chat.isFocused();
+  chat.setFocusable(false);   // 평소에는 포커스를 못 가져가게 (다른 프로그램 단축키·작업 표시줄 문제 방지)
+  if (hadFocus && !restoreForeground(prevForeground)) chat.blur();
+  prevForeground = null;
 }
 
 // 입력창에 "어느 채널로 보내는지" 표시. 채널을 따로 정하지 않았으면 볼 수 있는 첫 채팅 채널
@@ -332,7 +347,7 @@ app.whenReady().then(() => {
   }
 
   // 게임 쪽을 누르면 입력창에서 빠져나옴 → 다시 클릭 통과
-  wins.chat.on('blur', () => { if (!wins.chat.isDestroyed()) wins.chat.setIgnoreMouseEvents(true, { forward: true }); });
+  wins.chat.on('blur', () => { if (!wins.chat.isDestroyed()) { wins.chat.setIgnoreMouseEvents(true, { forward: true }); wins.chat.setFocusable(false); } });
 
   Promise.all(Object.values(wins).map((w) => new Promise((r) => w.webContents.once('did-finish-load', r)))).then(() => {
     sendSettings();
@@ -362,7 +377,12 @@ app.whenReady().then(() => {
   screen.on('display-metrics-changed', relayout);
 
   // 게임이 항상 위를 가로채는 경우 대비
-  setInterval(() => { alive().forEach((w) => w.setAlwaysOnTop(true, 'screen-saver')); chatOnTop(); }, 5000);
+  // 게임이 항상 위를 가로채는 경우 대비. 단 전체화면 창(유튜브·동영상)이 맨 앞이면 건드리지 않음 → 작업 표시줄이 튀어나오지 않게
+  const ownHandles = () => alive().map((w) => { const b = w.getNativeWindowHandle(); return b.length >= 8 ? b.readBigUInt64LE(0) : BigInt(b.readUInt32LE(0)); });
+  setInterval(() => {
+    if (foregroundIsFullscreen(ownHandles())) return;
+    alive().forEach((w) => w.setAlwaysOnTop(true, 'screen-saver'));
+  }, 5000);
 
   updater = setupUpdater((u) => {
     notifySettings('update', u);
@@ -412,8 +432,18 @@ app.whenReady().then(() => {
   ipcMain.on('set-clickable', (e, on) => {
     const win = BrowserWindow.fromWebContents(e.sender);
     if (!win || (win === wins.chat && win.isFocused())) return;   // 입력 중에는 클릭 받는 상태 유지
+    if (win === wins.chat) {
+      // 입력창·링크 위에 마우스가 올라가면 클릭해서 포커스를 받을 수 있게. 그 전에 게임 창을 기억
+      if (on) { prevForeground = foregroundWindow(); win.setFocusable(true); } else win.setFocusable(false);
+    }
     win.setIgnoreMouseEvents(!on, { forward: true });
   });
+  // 채팅 글 속 링크: http/https 만 브라우저로
+  ipcMain.on('open-link', (_e, url) => {
+    try { const u = new URL(String(url)); if (u.protocol === 'http:' || u.protocol === 'https:') shell.openExternal(u.href); } catch {}
+  });
+  // @멘션 자동완성: 서버에서 멤버 찾기
+  ipcMain.handle('search-members', async (_e, query) => (feed && feed.searchMembers ? feed.searchMembers(String(query || '').slice(0, 32)) : []));
 });
 
 app.on('second-instance', () => openSettings(settingsDeps));

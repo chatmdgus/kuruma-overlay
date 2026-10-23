@@ -9,9 +9,11 @@
 <body data-name="채팅">
   <div class="chat" id="chat">
     <div id="list" class="list"></div>
+    <button type="button" class="latest" id="latest">최신으로 ↓</button>
     <div class="input" id="input">
       <div class="pick" id="pick" hidden></div>
-      <div class="ibar"><button type="button" class="target" id="target" title="보낼 채널 고르기 (Tab으로 다음 채널)">#…</button><input id="text" maxlength="2000" placeholder="메시지 보내기"></div>
+      <div class="pick mention-pick" id="mention" hidden></div>
+      <div class="ibar"><button type="button" class="target" id="target" title="보낼 채널 고르기 (Tab: 다음 채널)">#…</button><input id="text" maxlength="2000" placeholder="메시지 보내기"></div>
     </div>
     <div class="status plate" id="status"><i></i><span></span></div>
   </div>
