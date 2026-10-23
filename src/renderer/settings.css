@@ -111,6 +111,7 @@ button.primary { background: var(--accent); color: var(--accent-ink); }
 footer { display: flex; align-items: center; gap: 8px; padding: 14px 28px; border-top: 1px solid var(--line); background: var(--bg); }
 .msg { margin-right: auto; color: var(--muted); font-size: 13px; }
 .msg.bad { color: var(--danger); }
+.msg.new { color: var(--accent); font-weight: 600; }
 
 /* 디스코드 계정 */
 .account { display: flex; align-items: center; gap: 12px; padding: 8px 0 4px; }

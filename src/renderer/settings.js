@@ -540,6 +540,10 @@ function showUpdate(u) {
     : u.state === 'error' ? '업데이트 확인 실패 · 다시'
     : '업데이트 확인';
   b.onclick = () => window.settingsApi.update(u.state === 'ready' ? 'install' : 'check');
+  // 새 버전이 준비되면 아래쪽에 안내 문구
+  const msg = $('main-msg');
+  if (u.state === 'ready') { msg.textContent = `새로운 업데이트가 있습니다 (v${u.version}) · 오른쪽 "업데이트"를 누르면 바로 적용`; msg.className = 'msg new'; }
+  else if (msg.classList.contains('new')) { msg.className = 'msg'; paintHotkey(); }
 }
 
 // ---------- 배치 프리셋 ----------

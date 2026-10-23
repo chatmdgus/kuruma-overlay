@@ -13,7 +13,7 @@ const { createTray } = require('./tray');
 const { startTunnel } = require('./tunnel');
 const { login, describeLoginError } = require('./login');
 const { thumbOpen, thumbSet, thumbClose, windowAlive, setOpacity, clipTop, minimizeWindow, closeWindow, placeWindow, watchForeground, windowInfo, foregroundWindow, restoreForeground, foregroundIsFullscreen } = require('./foreground');
-const { shell, desktopCapturer } = require('electron');
+const { shell, desktopCapturer, Notification } = require('electron');
 const { setupUpdater } = require('./updater');
 
 const MOCK = process.argv.includes('--mock');
@@ -109,6 +109,21 @@ function layoutAll(cfg = config.get()) {
   }
   syncThumbsWin();
   chatOnTop();
+}
+
+// 새 버전을 다 받으면 한 번만 알림: 윈도우 알림 + 채팅 오버레이에 안내 한 줄
+let announced = '';
+function announceUpdate(version) {
+  if (!version || announced === version) return;
+  announced = version;
+  const text = `새로운 업데이트가 있습니다 (v${version})`;
+  post(wins.chat, 'message', { id: `update-${version}`, author: { name: 'Kuruma Overlay', color: '#ff6b7a' }, text: `${text} · 설정이나 트레이 메뉴에서 업데이트` });
+  try {
+    if (!Notification.isSupported()) return;
+    const n = new Notification({ title: 'Kuruma Overlay', body: `${text}\n눌러서 설정 열기`, icon: path.join(__dirname, '..', 'assets', 'icon.png'), silent: true });
+    n.on('click', () => openSettings(settingsDeps));
+    n.show();
+  } catch {}
 }
 
 // 채팅 창이 사진 창과 겹치면 채팅이 위에 오게
@@ -651,6 +666,7 @@ app.whenReady().then(() => {
 
   updater = setupUpdater((u) => {
     notifySettings('update', u);
+    if (u.state === 'ready') announceUpdate(u.version);
     // 트레이 메뉴는 상태가 바뀌거나 10%마다만 다시 만듦 (열려 있는 메뉴가 닫히지 않게)
     const key = `${u.state}:${u.version || ''}:${Math.floor((u.percent || 0) / 10)}`;
     if (key !== lastUpdateKey) { lastUpdateKey = key; trayApi?.refresh(); }
