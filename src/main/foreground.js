@@ -178,22 +178,28 @@ function hideTaskbarOver(hwnd) {
       for (let i = 0; i < 8; i++) {
         h = a.FindWindowExW(null, h, cls, null);
         if (!h) break;
-        if (koffiAddress(a.MonitorFromWindow(h, 2)) === mon && a.IsWindowVisible(h)) {
-          a.ShowWindow(h, 0);   // SW_HIDE
-          hiddenBars.push(h);
-        }
+        // 전체화면 중엔 윈도우가 작업 표시줄을 이미 숨겨 뒀을 수도 있어서 보이는지와 상관없이 잡아 둠
+        if (koffiAddress(a.MonitorFromWindow(h, 2)) === mon) hiddenBars.push({ h, wasVisible: a.IsWindowVisible(h) });
       }
     }
-    return hiddenBars.length > 0;
+    if (!hiddenBars.length) return false;
+    // 포커스가 넘어온 뒤에 윈도우가 작업 표시줄을 다시 띄우므로, 입력하는 동안 계속 내려 둠
+    const keep = () => { for (const b of hiddenBars) { try { if (a.IsWindowVisible(b.h)) a.ShowWindow(b.h, 0); } catch {} } };   // SW_HIDE
+    keep();
+    barTimer = setInterval(keep, 100);
+    return true;
   } catch { return false; }
 }
 
+let barTimer = null;
 function restoreTaskbars() {
   const a = load();
+  clearInterval(barTimer);
+  barTimer = null;
   const bars = hiddenBars;
   hiddenBars = [];
   if (!a) return;
-  for (const h of bars) { try { if (a.IsWindow(h)) a.ShowWindow(h, 8); } catch {} }   // SW_SHOWNA
+  for (const b of bars) { try { if (b.wasVisible && a.IsWindow(b.h)) a.ShowWindow(b.h, 8); } catch {} }   // SW_SHOWNA (원래 보이던 것만)
 }
 
 function koffiAddress(h) {
