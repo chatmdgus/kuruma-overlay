@@ -111,13 +111,22 @@ function layoutAll(cfg = config.get()) {
   chatOnTop();
 }
 
-// 새 버전을 다 받으면 한 번만 알림: 윈도우 알림 + 채팅 오버레이에 안내 한 줄
+// 채팅 오버레이에 앱 안내 한 줄 (창이 아직 안 열렸으면 열린 뒤에)
+function chatNotice(id, text) {
+  const c = wins.chat;
+  if (!c || c.isDestroyed()) return;
+  const send = () => post(c, 'message', { id, author: { name: 'Kuruma Overlay', color: '#ff6b7a' }, text });
+  if (c.webContents.isLoading()) c.webContents.once('did-finish-load', () => setTimeout(send, 300)); else send();
+}
+
+// 새 버전을 찾으면 한 번만 알림 (켜자마자 확인하므로 보통 실행 직후): 윈도우 알림 + 채팅 오버레이에 안내 한 줄
+// 받는 건 백그라운드로, 다 받으면 설정·트레이의 "업데이트"로 바로 적용 (그냥 꺼도 끌 때 설치됨)
 let announced = '';
 function announceUpdate(version) {
   if (!version || announced === version) return;
   announced = version;
   const text = `새로운 업데이트가 있습니다 (v${version})`;
-  post(wins.chat, 'message', { id: `update-${version}`, author: { name: 'Kuruma Overlay', color: '#ff6b7a' }, text: `${text} · 설정이나 트레이 메뉴에서 업데이트` });
+  chatNotice(`update-${version}`, `${text} · 설정이나 트레이 메뉴에서 업데이트 (그냥 꺼도 끌 때 적용돼요)`);
   try {
     if (!Notification.isSupported()) return;
     const n = new Notification({ title: 'Kuruma Overlay', body: `${text}\n눌러서 설정 열기`, icon: path.join(__dirname, '..', 'assets', 'icon.png'), silent: true });
@@ -629,6 +638,11 @@ app.whenReady().then(() => {
   wins.chat.on('blur', () => { if (!wins.chat.isDestroyed()) { wins.chat.setIgnoreMouseEvents(true); wins.chat.setFocusable(false); } });
 
   Promise.all(Object.values(wins).map((w) => new Promise((r) => w.webContents.once('did-finish-load', r)))).then(() => {
+    // 지난번에 끌 때 업데이트가 설치됐으면 처음에 알려줌
+    const ver = app.getVersion();
+    const last = config.get().lastVersion;
+    if (app.isPackaged && last && last !== ver) chatNotice(`updated-${ver}`, `v${ver}로 업데이트됐어요`);
+    if (last !== ver) config.save({ lastVersion: ver });
     sendSettings();
     setInputOn(config.get().overlays.chat.inputOn !== false, { save: false });
     syncTunnel();
@@ -666,7 +680,7 @@ app.whenReady().then(() => {
 
   updater = setupUpdater((u) => {
     notifySettings('update', u);
-    if (u.state === 'ready') announceUpdate(u.version);
+    if (u.state === 'downloading' || u.state === 'ready') announceUpdate(u.version);
     // 트레이 메뉴는 상태가 바뀌거나 10%마다만 다시 만듦 (열려 있는 메뉴가 닫히지 않게)
     const key = `${u.state}:${u.version || ''}:${Math.floor((u.percent || 0) / 10)}`;
     if (key !== lastUpdateKey) { lastUpdateKey = key; trayApi?.refresh(); }

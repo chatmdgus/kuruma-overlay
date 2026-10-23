@@ -35,7 +35,7 @@ function setupUpdater(onState) {
   // 조용히 설치하고 끝나면 다시 실행
   api.install = () => { if (state.state === 'ready') autoUpdater.quitAndInstall(true, true); };
 
-  setTimeout(api.check, 8000);
+  setTimeout(api.check, 3000);   // 켜자마자 확인 → 새 버전이 있으면 처음에 바로 알림
   setInterval(api.check, CHECK_EVERY).unref?.();
   return api;
 }
