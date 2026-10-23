@@ -36,6 +36,8 @@ function load() {
       SetWindowLongPtrN: user32.func('intptr_t __stdcall SetWindowLongPtrW(intptr_t hWnd, int nIndex, intptr_t dwNewLong)'),
       SetLayeredWindowAttributesN: user32.func('bool __stdcall SetLayeredWindowAttributes(intptr_t hwnd, uint32_t crKey, uint8_t bAlpha, uint32_t dwFlags)'),
       SetWindowRgnN: user32.func('int __stdcall SetWindowRgn(intptr_t hWnd, void *hRgn, bool bRedraw)'),
+      GetWindowRgnN: user32.func('int __stdcall GetWindowRgn(intptr_t hWnd, void *hRgn)'),
+      GetRgnBox: gdi32.func('int __stdcall GetRgnBox(void *hrgn, _Out_ RECT *lprc)'),
       CreateRectRgn: gdi32.func('void * __stdcall CreateRectRgn(int x1, int y1, int x2, int y2)'),
       DeleteObject: gdi32.func('bool __stdcall DeleteObject(void *ho)'),
       PostMessageN: user32.func('bool __stdcall PostMessageW(intptr_t hWnd, uint32_t Msg, uintptr_t wParam, intptr_t lParam)'),
@@ -231,6 +233,20 @@ function clipTop(hwndNumber, top) {
   } catch { return false; }
 }
 
+// 창 위쪽이 지금 top 픽셀만큼 잘려 있는지 (디스코드가 창 크기를 다시 잡을 때 잘라낸 영역을 지워버림)
+function clippedTop(hwndNumber) {
+  const a = load();
+  if (!a) return -1;
+  let rgn = null;
+  try {
+    rgn = a.CreateRectRgn(0, 0, 0, 0);
+    if (!rgn || !a.GetWindowRgnN(hwndNumber, rgn)) return 0;   // ERROR = 영역 없음
+    const r = {};
+    a.GetRgnBox(rgn, r);
+    return r.top || 0;
+  } catch { return -1; } finally { if (rgn) try { a.DeleteObject(rgn); } catch {} }
+}
+
 // 다른 프로그램 창을 포커스 안 뺏고 최소화
 function minimizeWindow(hwndNumber) {
   const a = load();
@@ -245,4 +261,4 @@ function closeWindow(hwndNumber) {
   try { return a.PostMessageN(hwndNumber, 0x0010, 0, 0); } catch { return false; }   // WM_CLOSE
 }
 
-module.exports = { setOpacity, clipTop, minimizeWindow, closeWindow, hideTaskbarOver, restoreTaskbars, placeWindow, watchForeground, foregroundExe, windowInfo, foregroundWindow, restoreForeground, foregroundIsFullscreen, available: () => !!load() };
+module.exports = { clippedTop, setOpacity, clipTop, minimizeWindow, closeWindow, hideTaskbarOver, restoreTaskbars, placeWindow, watchForeground, foregroundExe, windowInfo, foregroundWindow, restoreForeground, foregroundIsFullscreen, available: () => !!load() };

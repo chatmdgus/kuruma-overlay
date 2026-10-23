@@ -12,7 +12,7 @@ const { setupSettings, openSettings, notifySettings } = require('./settings');
 const { createTray } = require('./tray');
 const { startTunnel } = require('./tunnel');
 const { login, describeLoginError } = require('./login');
-const { setOpacity, clipTop, minimizeWindow, closeWindow, hideTaskbarOver, restoreTaskbars, placeWindow, watchForeground, windowInfo, foregroundWindow, restoreForeground, foregroundIsFullscreen } = require('./foreground');
+const { clippedTop, setOpacity, clipTop, minimizeWindow, closeWindow, hideTaskbarOver, restoreTaskbars, placeWindow, watchForeground, windowInfo, foregroundWindow, restoreForeground, foregroundIsFullscreen } = require('./foreground');
 const { shell, desktopCapturer } = require('electron');
 const { setupUpdater } = require('./updater');
 
@@ -177,6 +177,16 @@ let lastPicked = [];
 const hwndOf = (w) => Number(String(w.id).split(':')[1]);
 let closers = [];          // 칸에 놓은 팝업마다 닫기 버튼 위치 (mirror 창 기준)
 const styled = new Set();  // 위 줄을 자르거나 투명하게 만든 팝업 (되돌릴 때 씀)
+const clipWant = new Map(); // 팝업 → 잘라야 할 위쪽 픽셀
+// 디스코드(크로미움)는 창 크기·상태가 바뀔 때 잘라낸 영역을 지워버림 → 지워졌으면 다시 자름
+function keepClipped() {
+  if (popupsDown) return;
+  for (const [id, top] of clipWant) {
+    if (!top || !styled.has(id)) continue;
+    const n = hwndOf({ id });
+    if (Number.isFinite(n) && clippedTop(n) === 0) clipTop(n, top);
+  }
+}
 function setClosers(list) {
   const was = closers.length > 0;
   closers = list;
@@ -190,6 +200,7 @@ function unstyle(keepIds = []) {
     const n = hwndOf({ id });
     if (Number.isFinite(n)) { clipTop(n, 0); setOpacity(n, 1); }
     styled.delete(id);
+    clipWant.delete(id);
   }
 }
 
@@ -214,13 +225,16 @@ function arrangeWindows(list, cfg = config.get(), force = false) {
     const dip = { x: c.x, y: c.y - T, width: c.width, height: c.height + T };
     const px = screen.dipToScreenRect(null, dip);   // 디스플레이 배율 → 실제 화면 픽셀
     placeWindow(n, px, true);
-    clipTop(n, T ? Math.round(T * px.height / dip.height) : 0);
-    setOpacity(n, op);
+    const tpx = T ? Math.round(T * px.height / dip.height) : 0;
+    setOpacity(n, op);   // 스타일을 바꾸면 디스코드가 영역을 지울 수 있어서 자르기보다 먼저
+    clipTop(n, tpx);
+    clipWant.set(w.id, tpx);
     styled.add(w.id);
   });
   const ox = Math.round(area.x), oy = Math.round(area.y);
   setClosers(list.map((w, i) => ({ id: w.id, x: cells[i].x - ox, y: cells[i].y - oy, width: cells[i].width, height: cells[i].height })));
   if (wins.mirror && !wins.mirror.isDestroyed()) wins.mirror.moveTop();   // 닫기 버튼이 팝업 위에 오게
+  for (const ms of [150, 600, 1500]) setTimeout(keepClipped, ms);   // 크기를 바꾼 직후 디스코드가 영역을 지우는 경우
   chatOnTop();
 }
 
@@ -603,6 +617,7 @@ app.whenReady().then(() => {
   setInterval(() => syncMirror(), 3000);
   // 팝업을 누르면 팝업이 맨 위로 올라와서 닫기 버튼을 덮음 → 1초마다 버튼 창을 다시 위로
   setInterval(() => {
+    keepClipped();
     const m = wins.mirror;
     if (!closers.length || popupsDown || !m || m.isDestroyed() || !m.isVisible()) return;
     if (foregroundIsFullscreen(ownHandles())) return;
