@@ -219,11 +219,10 @@ function emit(type, payload) {
       post(wins.chat, 'message', {
         id: payload.id,
         author: payload.author,
-        text: payload.content
-          || (payload.stickers?.length ? `스티커 · ${payload.stickers.join(', ')}` : '')
-          || (media.length ? (media[0].kind === 'video' ? '영상을 보냄' : '사진을 보냄') : ''),
+        text: payload.content || (payload.stickers?.length ? '' : (media.length ? (media[0].kind === 'video' ? '영상을 보냄' : '사진을 보냄') : '')),
+        stickers: (payload.stickers || []).filter((st) => st && typeof st === 'object').slice(0, 3),
         channel: channelNames.get(payload.channelId) || null,
-        mediaOnly: !payload.content && (media.length > 0 || payload.stickers?.length > 0),
+        mediaOnly: !payload.content && media.length > 0,
       });
       for (const m of media) post(wins.media, 'media', m);
       // 채널을 따로 정하지 않았으면 마지막으로 글이 올라온 채널로 보냄 (입력 중에는 안 바꿈)
@@ -367,6 +366,23 @@ app.whenReady().then(() => {
     postTarget();
   });
   ipcMain.on('open-settings', () => openSettings(settingsDeps));
+  // 디스코드 기본 스티커(Lottie json)는 브라우저에서 바로 못 받아서(CORS) 여기서 받아 넘김
+  const lottieCache = new Map();
+  ipcMain.handle('fetch-lottie', async (_e, url) => {
+    try {
+      const u = new URL(String(url));
+      if (u.protocol !== 'https:' || !['discord.com', 'cdn.discordapp.com', 'media.discordapp.net'].includes(u.hostname)) return null;
+      if (lottieCache.has(u.href)) return lottieCache.get(u.href);
+      const res = await fetch(u.href);
+      if (!res.ok) return null;
+      const text = await res.text();
+      if (text.length > 2e6) return null;
+      const data = JSON.parse(text);
+      if (lottieCache.size > 50) lottieCache.clear();
+      lottieCache.set(u.href, data);
+      return data;
+    } catch { return null; }
+  });
   // 설정 버튼 위에 마우스가 있는 동안만 클릭을 받음 (채팅 입력 모드 중인 채팅 창은 건드리지 않음)
   ipcMain.on('set-clickable', (e, on) => {
     const win = BrowserWindow.fromWebContents(e.sender);

@@ -12,4 +12,5 @@ contextBridge.exposeInMainWorld('overlay', {
   openSettings() { ipcRenderer.send('open-settings'); },
   endInput() { ipcRenderer.send('end-input'); },
   setTarget(id) { ipcRenderer.send('set-target', id || null); },
+  fetchLottie(url) { return ipcRenderer.invoke('fetch-lottie', url); },
 });

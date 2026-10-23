@@ -21,7 +21,36 @@ function scheduleFade(row) {
   }, settings.fadeSec * 1000);
 }
 
-function addMessage({ id, author = {}, text: body, mediaOnly, channel }) {
+// 스티커: 말풍선 안에 그림으로. 디스코드 기본 스티커(Lottie)는 애니메이션으로 그림
+function stickerBox(stickers) {
+  const box = document.createElement('span');
+  box.className = 'stickers';
+  for (const st of stickers) {
+    if (st.kind === 'lottie') {
+      const el = document.createElement('span');
+      el.className = 'sticker lottie';
+      el.title = st.name || '';
+      box.append(el);
+      if (window.lottie) {
+        window.overlay.fetchLottie(st.url).then((data) => {
+          if (data) window.lottie.loadAnimation({ container: el, renderer: 'svg', loop: true, autoplay: true, animationData: data });
+          else el.textContent = st.name || '스티커';
+        });
+      } else el.textContent = st.name || '스티커';
+    } else {
+      const img = document.createElement('img');
+      img.className = 'sticker';
+      img.src = st.url;
+      img.alt = st.name || '';
+      img.title = st.name || '';
+      img.onerror = () => img.replaceWith(Object.assign(document.createElement('span'), { className: 'note', textContent: st.name || '스티커' }));
+      box.append(img);
+    }
+  }
+  return box;
+}
+
+function addMessage({ id, author = {}, text: body, mediaOnly, channel, stickers = [] }) {
   const row = document.createElement('div');
   row.className = 'msg plate fade';
   row.dataset.id = id;
@@ -41,6 +70,7 @@ function addMessage({ id, author = {}, text: body, mediaOnly, channel }) {
     line.append(tag);
   }
   line.append(name, span);
+  if (stickers.length) line.append(stickerBox(stickers));
 
   row.append(ui.avatar(author), line);
   list.appendChild(row);

@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
   <meta charset="utf-8">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'; font-src 'self'; script-src 'self'; img-src 'self' data: https://cdn.discordapp.com https://media.discordapp.net">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; script-src 'self'; img-src 'self' data: https://cdn.discordapp.com https://media.discordapp.net">
   <link rel="stylesheet" href="fonts.css">
   <link rel="stylesheet" href="overlay.css">
 </head>
@@ -15,6 +15,7 @@
     </div>
     <div class="status plate" id="status"><i></i><span></span></div>
   </div>
+  <script src="../../node_modules/lottie-web/build/player/lottie_light.min.js"></script>
   <script src="common.js"></script>
   <script src="chat.js"></script>
 </body>

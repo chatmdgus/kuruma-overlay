@@ -272,3 +272,8 @@ body.editing::after {
 .gif-empty { display: none; color: var(--ink-soft); font-size: 13px; text-align: center; padding: 10px; }
 body.editing .gif-empty:not([hidden]) { display: block; }
 @keyframes gif-pop { from { opacity: 0; transform: scale(0.7); } }
+
+/* 스티커 (채팅 말풍선 안) */
+.msg .stickers { display: flex; gap: 0.4em; margin-top: 0.35em; }
+.msg .sticker { width: 6.2em; height: 6.2em; object-fit: contain; display: block; animation: gif-pop 0.45s cubic-bezier(0.2, 1.4, 0.4, 1) both; }
+.msg .sticker.lottie { display: grid; place-items: center; color: var(--ink-soft); font-size: 0.85em; }
