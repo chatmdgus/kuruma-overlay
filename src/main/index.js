@@ -12,7 +12,7 @@ const { setupSettings, openSettings, notifySettings } = require('./settings');
 const { createTray } = require('./tray');
 const { startTunnel } = require('./tunnel');
 const { login, describeLoginError } = require('./login');
-const { watchForeground, windowInfo, foregroundWindow, restoreForeground, foregroundIsFullscreen } = require('./foreground');
+const { placeWindow, watchForeground, windowInfo, foregroundWindow, restoreForeground, foregroundIsFullscreen } = require('./foreground');
 const { shell, desktopCapturer } = require('electron');
 const { setupUpdater } = require('./updater');
 
@@ -102,12 +102,61 @@ async function syncMirror(cfg = config.get()) {
     } catch (e) { console.error('[mirror]', e.message); }
   }
   picked = picked.slice(0, 4).map(({ id, name }) => ({ id, name }));
-  const key = JSON.stringify(picked);
+  lastPicked = picked;
+  const arrange = (o.show || 'arrange') === 'arrange';
+  if (arrange) arrangeWindows(picked, cfg);
+  // 칸에 맞춰 배치하는 방식이면 비추는 화면은 안 씀 (빈 목록)
+  const key = arrange ? '[]' : JSON.stringify(picked);
   if (key === mirrorKey) return;
   const wasEmpty = mirrorKey === '[]';
   mirrorKey = key;
-  post(wins.mirror, 'mirror-sources', picked);
+  post(wins.mirror, 'mirror-sources', arrange ? [] : picked);
   if (wasEmpty !== (key === '[]')) layoutAll();   // 비출 창이 생기거나 없어지면 보이기/숨기기
+}
+
+// 팝업 창을 "방송 화면" 칸에 개수대로 나눠서 실제로 옮겨 놓음 (항상 위)
+// 창 목록이나 칸 위치가 바뀔 때만 다시 맞춤 → 사용자가 잠깐 옮겨도 계속 끌어당기지는 않음
+let arrangeKey = '';
+let lastPicked = [];
+function arrangeWindows(list, cfg = config.get(), force = false) {
+  const o = cfg.overlays.mirror;
+  const d = resolveDisplay(o.monitor, cfg);
+  const tall = d.bounds.height > d.bounds.width;
+  const r = tall ? (o.rectTall || config.DEFAULTS.overlays.mirror.rectTall) : o.rect;
+  const area = { x: d.bounds.x + r.x * d.bounds.width, y: d.bounds.y + r.y * d.bounds.height, width: r.w * d.bounds.width, height: r.h * d.bounds.height };
+  const key = JSON.stringify([list.map((w) => w.id), area]);
+  if (!list.length || (key === arrangeKey && !force)) { arrangeKey = list.length ? key : ''; return; }
+  arrangeKey = key;
+  const cells = gridCells(list.length, area, 6);
+  list.forEach((w, i) => {
+    const n = Number(String(w.id).split(':')[1]);
+    if (!Number.isFinite(n)) return;
+    const px = screen.dipToScreenRect(null, cells[i]);   // 디스플레이 배율 → 실제 화면 픽셀
+    placeWindow(n, px, true);
+  });
+}
+
+// 16:9 화면이 가장 크게 들어가는 칸 나누기 (넓은 칸이면 옆으로, 좁으면 위아래)
+function gridCells(n, area, gap) {
+  let best = { cols: 1, score: 0 };
+  for (let cols = 1; cols <= n; cols++) {
+    const rows = Math.ceil(n / cols);
+    const cw = (area.width - gap * (cols - 1)) / cols;
+    const ch = (area.height - gap * (rows - 1)) / rows;
+    const w = Math.min(cw, ch * 16 / 9);
+    const score = w * w;
+    if (score > best.score * 1.01 || (score > best.score * 0.99 && area.width > area.height * 1.5)) best = { cols, score };
+  }
+  const cols = best.cols;
+  const rows = Math.ceil(n / cols);
+  const cw = (area.width - gap * (cols - 1)) / cols;
+  const ch = (area.height - gap * (rows - 1)) / rows;
+  return Array.from({ length: n }, (_, i) => ({
+    x: Math.round(area.x + (i % cols) * (cw + gap)),
+    y: Math.round(area.y + Math.floor(i / cols) * (ch + gap)),
+    width: Math.round(cw),
+    height: Math.round(ch),
+  }));
 }
 
 function chatOnTop() {
@@ -363,6 +412,8 @@ const settingsDeps = {
   previewConfig: (partial) => {
     const merged = config.merge(config.get(), partial);
     layoutAll(merged);
+    // 배치 화면에서 방송 칸을 옮기면 팝업 창도 바로 따라감
+    if (merged.overlays.mirror.enabled && (merged.overlays.mirror.show || 'arrange') === 'arrange') arrangeWindows(lastPicked, merged);
     sendSettings(merged);
     syncInputOn(merged);
   },

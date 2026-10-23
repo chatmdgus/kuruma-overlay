@@ -198,6 +198,14 @@ function fillMain() {
 
   bindSeg('media-max', [1, 2, 3].map((v) => ({ label: `${v}장`, value: v })), () => o.media.maxItems, (v) => { o.media.maxItems = v; });
   // 방송 화면 (창 비추기)
+  const paintShow = () => {
+    $('mirror-show-note').textContent = (o.mirror.show || 'arrange') === 'arrange'
+      ? '팝업 창을 이 칸에 개수대로 나눠서 옮겨 놓음 (항상 위)'
+      : '팝업 화면만 비춰서 보여줌 (팝업 창은 다른 곳에 열어 둬야 함)';
+  };
+  bindSeg('mirror-show', [{ label: '팝업을 칸에 배치', value: 'arrange' }, { label: '화면만 비추기', value: 'mirror' }],
+    () => o.mirror.show || 'arrange', (v) => { o.mirror.show = v; paintShow(); });
+  paintShow();
   bindSeg('mirror-mode', [{ label: '디스코드 팝업 자동', value: 'discord' }, { label: '직접 고르기', value: 'pick' }],
     () => o.mirror.mode || 'discord', (v) => { o.mirror.mode = v; paintMirror(); });
   $('mirror-refresh').onclick = () => paintMirror(true);
@@ -612,7 +620,7 @@ async function paintMirror(refresh) {
   $('mirror-pick').hidden = !pickMode;
   $('mirror-note').textContent = pickMode
     ? `고른 창 ${(o.titles || []).length}개 · 최대 4개`
-    : '디스코드에서 방송을 팝업으로 띄우면 자동으로 보여요 (여러 개면 칸을 나눔)';
+    : '디스코드에서 방송을 팝업으로 띄우면 자동으로 이 칸에 들어와요 (여러 개면 칸을 나눔)';
   if (!pickMode) return;
   if (refresh || !windowCache) {
     $('mirror-list').textContent = '창 목록 불러오는 중…';

@@ -28,6 +28,9 @@ function load() {
       // 창 번호(숫자)로 부르는 버전: desktopCapturer 의 "window:<번호>:0" 용
       PidOfN: user32.func('uint32_t __stdcall GetWindowThreadProcessId(intptr_t hWnd, _Out_ uint32_t *lpdwProcessId)'),
       RectOfN: user32.func('bool __stdcall GetWindowRect(intptr_t hWnd, _Out_ RECT *lpRect)'),
+      SetWindowPosN: user32.func('bool __stdcall SetWindowPos(intptr_t hWnd, intptr_t hWndInsertAfter, int X, int Y, int cx, int cy, uint32_t uFlags)'),
+      IsIconicN: user32.func('bool __stdcall IsIconic(intptr_t hWnd)'),
+      ShowWindowN: user32.func('bool __stdcall ShowWindow(intptr_t hWnd, int nCmdShow)'),
     };
   } catch (e) {
     console.error('[foreground] 사용할 수 없음:', e.message);
@@ -130,4 +133,16 @@ function koffiAddress(h) {
   try { return require('koffi').address(h); } catch { return h; }
 }
 
-module.exports = { watchForeground, foregroundExe, windowInfo, foregroundWindow, restoreForeground, foregroundIsFullscreen, available: () => !!load() };
+// 다른 프로그램 창을 옮기고 크기 바꾸기 (화면 픽셀 기준). topmost 면 항상 위로
+function placeWindow(hwndNumber, { x, y, width, height }, topmost = true) {
+  const a = load();
+  if (!a) return false;
+  try {
+    if (a.IsIconicN(hwndNumber)) a.ShowWindowN(hwndNumber, 4);   // 최소화돼 있으면 포커스 안 뺏고 되돌림 (SW_SHOWNOACTIVATE)
+    const SWP_NOACTIVATE = 0x0010, SWP_SHOWWINDOW = 0x0040, SWP_NOOWNERZORDER = 0x0200;
+    return a.SetWindowPosN(hwndNumber, topmost ? -1 : -2, Math.round(x), Math.round(y), Math.round(width), Math.round(height),
+      SWP_NOACTIVATE | SWP_SHOWWINDOW | SWP_NOOWNERZORDER);
+  } catch { return false; }
+}
+
+module.exports = { placeWindow, watchForeground, foregroundExe, windowInfo, foregroundWindow, restoreForeground, foregroundIsFullscreen, available: () => !!load() };
