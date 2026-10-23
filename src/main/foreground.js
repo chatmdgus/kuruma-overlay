@@ -31,6 +31,9 @@ function load() {
       SetWindowPosN: user32.func('bool __stdcall SetWindowPos(intptr_t hWnd, intptr_t hWndInsertAfter, int X, int Y, int cx, int cy, uint32_t uFlags)'),
       IsIconicN: user32.func('bool __stdcall IsIconic(intptr_t hWnd)'),
       ShowWindowN: user32.func('bool __stdcall ShowWindow(intptr_t hWnd, int nCmdShow)'),
+      ShowWindow: user32.func('bool __stdcall ShowWindow(void *hWnd, int nCmdShow)'),
+      IsWindowVisible: user32.func('bool __stdcall IsWindowVisible(void *hWnd)'),
+      FindWindowExW: user32.func('void * __stdcall FindWindowExW(void *hWndParent, void *hWndChildAfter, str16 lpszClass, str16 lpszWindow)'),
     };
   } catch (e) {
     console.error('[foreground] 사용할 수 없음:', e.message);
@@ -111,7 +114,18 @@ function restoreForeground(hwnd) {
   try { return a.IsWindow(hwnd) && a.SetForegroundWindow(hwnd); } catch { return false; }
 }
 
-// 맨 앞 창이 모니터 전체를 덮는지 (유튜브 전체화면, 전체화면 게임 등)
+// 이 창이 모니터 전체를 덮는지 (유튜브 전체화면, 전체화면 게임 등)
+function isFullscreen(a, hwnd) {
+  const r = {};
+  if (!a.GetWindowRect(hwnd, r)) return false;
+  const mon = a.MonitorFromWindow(hwnd, 2);   // MONITOR_DEFAULTTONEAREST
+  const mi = { cbSize: 40, rcMonitor: {}, rcWork: {}, dwFlags: 0 };
+  if (!mon || !a.GetMonitorInfoW(mon, mi)) return false;
+  const m = mi.rcMonitor;
+  return r.left <= m.left && r.top <= m.top && r.right >= m.right && r.bottom >= m.bottom;
+}
+
+// 맨 앞 창이 전체화면인지 (우리 창은 빼고)
 function foregroundIsFullscreen(ownHandles = []) {
   const a = load();
   if (!a) return false;
@@ -119,14 +133,40 @@ function foregroundIsFullscreen(ownHandles = []) {
     const hwnd = a.GetForegroundWindow();
     if (!hwnd) return false;
     if (ownHandles.includes(koffiAddress(hwnd))) return false;   // 우리 창이면 전체화면 아님
-    const r = {};
-    if (!a.GetWindowRect(hwnd, r)) return false;
-    const mon = a.MonitorFromWindow(hwnd, 2);   // MONITOR_DEFAULTTONEAREST
-    const mi = { cbSize: 40, rcMonitor: {}, rcWork: {}, dwFlags: 0 };
-    if (!mon || !a.GetMonitorInfoW(mon, mi)) return false;
-    const m = mi.rcMonitor;
-    return r.left <= m.left && r.top <= m.top && r.right >= m.right && r.bottom >= m.bottom;
+    return isFullscreen(a, hwnd);
   } catch { return false; }
+}
+
+// 전체화면(유튜브 등) 위에서 채팅을 칠 때: 포커스가 넘어오면 윈도우가 그 모니터의 작업 표시줄을 띄움
+// → 입력하는 동안만 그 모니터의 작업 표시줄을 숨기고, 입력이 끝나면 되돌림
+let hiddenBars = [];
+function hideTaskbarOver(hwnd) {
+  const a = load();
+  if (!a || !hwnd || hiddenBars.length) return false;
+  try {
+    if (!a.IsWindow(hwnd) || !isFullscreen(a, hwnd)) return false;
+    const mon = koffiAddress(a.MonitorFromWindow(hwnd, 2));
+    for (const cls of ['Shell_TrayWnd', 'Shell_SecondaryTrayWnd']) {
+      let h = null;
+      for (let i = 0; i < 8; i++) {
+        h = a.FindWindowExW(null, h, cls, null);
+        if (!h) break;
+        if (koffiAddress(a.MonitorFromWindow(h, 2)) === mon && a.IsWindowVisible(h)) {
+          a.ShowWindow(h, 0);   // SW_HIDE
+          hiddenBars.push(h);
+        }
+      }
+    }
+    return hiddenBars.length > 0;
+  } catch { return false; }
+}
+
+function restoreTaskbars() {
+  const a = load();
+  const bars = hiddenBars;
+  hiddenBars = [];
+  if (!a) return;
+  for (const h of bars) { try { if (a.IsWindow(h)) a.ShowWindow(h, 8); } catch {} }   // SW_SHOWNA
 }
 
 function koffiAddress(h) {
@@ -145,4 +185,4 @@ function placeWindow(hwndNumber, { x, y, width, height }, topmost = true) {
   } catch { return false; }
 }
 
-module.exports = { placeWindow, watchForeground, foregroundExe, windowInfo, foregroundWindow, restoreForeground, foregroundIsFullscreen, available: () => !!load() };
+module.exports = { hideTaskbarOver, restoreTaskbars, placeWindow, watchForeground, foregroundExe, windowInfo, foregroundWindow, restoreForeground, foregroundIsFullscreen, available: () => !!load() };

@@ -12,7 +12,7 @@ const { setupSettings, openSettings, notifySettings } = require('./settings');
 const { createTray } = require('./tray');
 const { startTunnel } = require('./tunnel');
 const { login, describeLoginError } = require('./login');
-const { placeWindow, watchForeground, windowInfo, foregroundWindow, restoreForeground, foregroundIsFullscreen } = require('./foreground');
+const { hideTaskbarOver, restoreTaskbars, placeWindow, watchForeground, windowInfo, foregroundWindow, restoreForeground, foregroundIsFullscreen } = require('./foreground');
 const { shell, desktopCapturer } = require('electron');
 const { setupUpdater } = require('./updater');
 
@@ -313,7 +313,16 @@ function startTyping() {
   if (!chat.isFocused()) prevForeground = foregroundWindow();
   chat.setFocusable(true);
   chat.setIgnoreMouseEvents(false);   // 입력 중에는 창 전체로 휠 스크롤·링크 클릭
+  hideTaskbarOver(prevForeground);    // 전체화면 위에서 치면 작업 표시줄이 튀어나오지 않게
   chat.focus();
+}
+
+// 전체화면 창이 다시 앞에 온 뒤에 작업 표시줄을 되돌려야 안 깜빡임. 그새 다시 입력 중이면 그대로 둠
+function restoreTaskbarsLater() {
+  setTimeout(() => {
+    const c = wins.chat;
+    if (!c || c.isDestroyed() || !c.isFocused()) restoreTaskbars();
+  }, 150);
 }
 
 // 입력을 끝내면 게임으로 포커스를 돌려주고 다시 클릭 통과
@@ -325,6 +334,7 @@ function endTyping() {
   chat.setFocusable(false);   // 평소에는 포커스를 못 가져가게 (다른 프로그램 단축키·작업 표시줄 문제 방지)
   if (hadFocus && !restoreForeground(prevForeground)) chat.blur();
   prevForeground = null;
+  restoreTaskbarsLater();
 }
 
 // 입력창에 "어느 채널로 보내는지" 표시. 채널을 따로 정하지 않았으면 볼 수 있는 첫 채팅 채널
@@ -456,6 +466,8 @@ app.whenReady().then(() => {
 
   // 게임 쪽을 누르면 입력창에서 빠져나옴 → 다시 클릭 통과
   wins.chat.on('blur', () => { if (!wins.chat.isDestroyed()) { wins.chat.setIgnoreMouseEvents(true, { forward: true }); wins.chat.setFocusable(false); } });
+  wins.chat.on('focus', () => hideTaskbarOver(prevForeground));   // 마우스로 입력창을 눌렀을 때도
+  wins.chat.on('blur', restoreTaskbarsLater);
 
   Promise.all(Object.values(wins).map((w) => new Promise((r) => w.webContents.once('did-finish-load', r)))).then(() => {
     sendSettings();
@@ -559,8 +571,10 @@ app.whenReady().then(() => {
 app.on('second-instance', () => openSettings(settingsDeps));
 
 app.on('before-quit', () => { quitting = true; });
+process.on('exit', () => { try { restoreTaskbars(); } catch {} });   // 숨긴 작업 표시줄은 무슨 일이 있어도 되돌림
 
 app.on('will-quit', () => {
+  restoreTaskbars();
   globalShortcut.unregisterAll();
   feed && feed.stop();
   tunnel && tunnel.stop();
