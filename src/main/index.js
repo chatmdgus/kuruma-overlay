@@ -92,6 +92,16 @@ function discordPopouts(all) {
   if (!main) main = dc.reduce((a, b) => (a.width * a.height >= b.width * b.height ? a : b));
   return dc.filter((w) => w !== main);
 }
+// 창 목록은 맨 앞에 있는 순서로 오기 때문에 팝업을 누를 때마다 순서가 바뀜
+// → 처음 보인 순서대로 고정 (새 창은 뒤에 붙고, 닫힌 창은 빠짐)
+const seenOrder = new Map();
+let seenSeq = 0;
+function stableOrder(list) {
+  const ids = new Set(list.map((w) => w.id));
+  for (const id of [...seenOrder.keys()]) if (!ids.has(id)) seenOrder.delete(id);
+  for (const w of list) if (!seenOrder.has(w.id)) seenOrder.set(w.id, ++seenSeq);
+  return [...list].sort((a, b) => seenOrder.get(a.id) - seenOrder.get(b.id));
+}
 async function syncMirror(cfg = config.get()) {
   const o = cfg.overlays.mirror;
   let picked = [];
@@ -101,7 +111,7 @@ async function syncMirror(cfg = config.get()) {
       picked = o.mode === 'pick' ? all.filter((w) => (o.titles || []).includes(w.name)) : discordPopouts(all);
     } catch (e) { console.error('[mirror]', e.message); }
   }
-  picked = picked.slice(0, 4).map(({ id, name }) => ({ id, name }));
+  picked = stableOrder(picked).slice(0, 4).map(({ id, name }) => ({ id, name }));
   lastPicked = picked;
   const arrange = (o.show || 'arrange') === 'arrange';
   if (arrange) arrangeWindows(picked, cfg);
