@@ -1,15 +1,15 @@
 :root {
-  --bg: #15171c;
-  --panel: #1c1f26;
-  --field: #252932;
-  --line: #2c313b;
-  --ink: #eef0f4;
-  --muted: #959cab;
-  --accent: #a7b4ff;
-  --accent-ink: #11131a;
+  --bg: #161114;
+  --panel: #1f181b;
+  --field: #2a2125;
+  --line: #34292e;
+  --ink: #f6eef0;
+  --muted: #a8979d;
+  --accent: #ff6b7a;   /* 빨간 테마 (다운로드 사이트와 같은 색) */
+  --accent-ink: #2a0a10;
   --ok: #7be0a8;
   --danger: #ff7a7a;
-  --chat: #a7b4ff;
+  --chat: #ff6b7a;
   --media: #7be0a8;
   --voice: #ffb86b;
 }
@@ -68,8 +68,8 @@ input[type=text]:focus, input[type=password]:focus { border-color: var(--accent)
 
 /* 배치 무대 */
 .stage { position: relative; height: 340px; background: var(--panel); border-radius: 12px; overflow: hidden; }
-.mon { position: absolute; border: 1.5px solid #3a404c; border-radius: 6px; background: #0f1115; }
-.mon.used { border-color: #6b7384; }
+.mon { position: absolute; border: 1.5px solid #43363b; border-radius: 6px; background: #120d0f; }
+.mon.used { border-color: #7d6a70; }
 .mon .tag { position: absolute; left: 8px; top: 5px; font-size: 11.5px; font-weight: 700; color: var(--ink); pointer-events: none; white-space: nowrap; }
 .mon:not(.used) { opacity: 0.5; }
 .mon:not(.used) .tag { color: var(--muted); font-weight: 500; }
@@ -77,7 +77,7 @@ input[type=text]:focus, input[type=password]:focus { border-color: var(--accent)
 .box { position: absolute; border: 1.5px solid; border-radius: 6px; cursor: grab; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; user-select: none; touch-action: none; }
 .box.dragging { cursor: grabbing; }
 .box.off { display: none; }
-.box.chat { border-color: var(--chat); background: rgba(167, 180, 255, 0.16); color: var(--chat); }
+.box.chat { border-color: var(--chat); background: rgba(255, 107, 122, 0.16); color: var(--chat); }
 .box.media { border-color: var(--media); background: rgba(123, 224, 168, 0.16); color: var(--media); }
 .box.voice { border-color: var(--voice); background: rgba(255, 184, 107, 0.16); color: var(--voice); }
 .box.chat { z-index: 2; }
@@ -87,7 +87,7 @@ input[type=text]:focus, input[type=password]:focus { border-color: var(--accent)
 /* 표시할 오버레이: 눌러서 켜고 끄는 칩 */
 .chips { display: flex; gap: 8px; margin-top: 12px; }
 .chip { height: 32px; padding: 0 14px; border-radius: 999px; background: transparent; color: var(--muted); box-shadow: inset 0 0 0 1.5px var(--line); }
-.chip[aria-pressed=true].chat { color: var(--chat); box-shadow: inset 0 0 0 1.5px var(--chat); background: rgba(167, 180, 255, 0.12); }
+.chip[aria-pressed=true].chat { color: var(--chat); box-shadow: inset 0 0 0 1.5px var(--chat); background: rgba(255, 107, 122, 0.12); }
 .chip[aria-pressed=true].media { color: var(--media); box-shadow: inset 0 0 0 1.5px var(--media); background: rgba(123, 224, 168, 0.12); }
 .chip[aria-pressed=true].voice { color: var(--voice); box-shadow: inset 0 0 0 1.5px var(--voice); background: rgba(255, 184, 107, 0.12); }
 .chip[aria-pressed=false] { text-decoration: line-through; }

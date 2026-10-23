@@ -1,6 +1,6 @@
 // 오버레이 화면 공용 도우미
 window.ui = (() => {
-  const PALETTE = ['#a7b4ff', '#7be0a8', '#ffb86b', '#ff8fb1', '#8fd8ff', '#d4a6ff', '#f5e17a'];
+  const PALETTE = ['#ff8a96', '#7be0a8', '#ffb86b', '#ff8fb1', '#8fd8ff', '#d4a6ff', '#f5e17a'];
   const SVG_NS = 'http://www.w3.org/2000/svg';
 
   function colorFor(id, given) {

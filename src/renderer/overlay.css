@@ -1,10 +1,10 @@
 :root {
   --ink: #f4f5f8;
   --ink-soft: #c3c8d4;
-  --plate: 12, 14, 20;          /* 말풍선 바탕색 (RGB) */
+  --plate: 18, 11, 14;          /* 말풍선 바탕색 (RGB) */
   --bg: 0.45;                   /* 말풍선 진하기, 설정에서 바뀜 */
   --edge: rgba(255, 255, 255, 0.08);
-  --accent: #a7b4ff;
+  --accent: #ff6b7a;
   --danger: #ff7a7a;
   --ok: #7be0a8;
   --fs: 15px;
@@ -169,7 +169,7 @@ html, body {
 body.editing::before {
   content: '';
   position: fixed; inset: 1px;
-  border: 1.5px dashed rgba(167, 180, 255, 0.9);
+  border: 1.5px dashed rgba(255, 107, 122, 0.9);
   border-radius: 10px;
   pointer-events: none;
 }
@@ -178,8 +178,8 @@ body.editing::after {
   position: fixed; left: 8px; top: 8px;
   padding: 3px 10px;
   border-radius: 999px;
-  background: rgba(167, 180, 255, 0.95);
-  color: #11131a;
+  background: rgba(255, 107, 122, 0.95);
+  color: #2a0a10;
   font-size: 12px; font-weight: 700;
   pointer-events: none;
 }
