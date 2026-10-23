@@ -12,7 +12,7 @@ const { setupSettings, openSettings, notifySettings } = require('./settings');
 const { createTray } = require('./tray');
 const { startTunnel } = require('./tunnel');
 const { login, describeLoginError } = require('./login');
-const { fullscreenOn, windowRect, thumbOpen, thumbSet, thumbClose, windowAlive, windowIsFullscreen, setOpacity, clipTop, minimizeWindow, closeWindow, hideTaskbarOver, restoreTaskbars, placeWindow, watchForeground, windowInfo, foregroundWindow, restoreForeground, foregroundIsFullscreen } = require('./foreground');
+const { thumbOpen, thumbSet, thumbClose, windowAlive, setOpacity, clipTop, minimizeWindow, closeWindow, placeWindow, watchForeground, windowInfo, foregroundWindow, restoreForeground, foregroundIsFullscreen } = require('./foreground');
 const { shell, desktopCapturer } = require('electron');
 const { setupUpdater } = require('./updater');
 
@@ -102,7 +102,6 @@ function layoutAll(cfg = config.get()) {
     const noGif = (name === 'gif' && !o.file && !editing)   // GIF 를 아직 안 골랐으면 숨김 (배치 중엔 자리 표시)
       || (name === 'mirror' && !mirrorShown(cfg) && !editing);   // 비출 창(또는 닫기 버튼 놓을 팝업)이 없으면 숨김
     if (!o.enabled || userHidden || hideForDiscord || noGif || name === 'voice') { win.hide(); continue; }
-    if (name === 'chat' && covering) continue;   // 입력 중 모니터 전체로 넓혀 둔 동안은 그대로
     const d = resolveDisplay(o.monitor, cfg);
     const tall = d.bounds.height > d.bounds.width;
     placeOverlay(win, d, tall ? (o.rectTall || config.DEFAULTS.overlays[name].rectTall) : o.rect);
@@ -470,51 +469,7 @@ function startTyping() {
   if (!chat.isFocused()) prevForeground = foregroundWindow();
   chat.setFocusable(true);
   chat.setIgnoreMouseEvents(false);   // 입력 중에는 창 전체로 휠 스크롤·링크 클릭
-  guardTaskbar();                     // 전체화면 위에서 치면 작업 표시줄이 튀어나오지 않게
   chat.focus();
-}
-
-// 윈도우는 맨 앞 창이 모니터를 꽉 채우고 있을 때만 작업 표시줄을 내려 둠
-// → 전체화면(유튜브 등) 위에서 입력하는 동안 투명한 채팅 창을 그 모니터 전체로 넓혀 둠 (글자 위치는 그대로)
-let covering = null;
-// 채팅 창이 있는 모니터에서 전체화면인 창 (맨 앞 창이 아니어도: 게임은 다른 모니터, 유튜브는 이 모니터)
-function fullscreenUnderChat() {
-  const chat = wins.chat;
-  if (!chat || chat.isDestroyed()) return null;
-  const disp = screen.getDisplayMatching(covering ? covering.orig : chat.getBounds());
-  const mon = screen.dipToScreenRect(null, disp.bounds);
-  return fullscreenOn(mon, (addr) => lastPicked.some((w) => String(addr) === String(hwndOf(w))));
-}
-// 입력을 시작할 때: 그 모니터 작업 표시줄을 숨기고, 채팅 창을 모니터 전체로 넓혀 둠
-function guardTaskbar() {
-  const fs = fullscreenUnderChat();
-  if (!fs) return;
-  hideTaskbarOver(fs);
-  coverMonitor();
-}
-function coverMonitor() {
-  const chat = wins.chat;
-  if (covering || !chat || chat.isDestroyed()) return;
-  const orig = chat.getBounds();
-  const disp = screen.getDisplayMatching(orig);
-  covering = { orig };
-  post(chat, 'cover', { x: orig.x - disp.bounds.x, y: orig.y - disp.bounds.y, width: orig.width, height: orig.height });
-  chat.setBounds(disp.bounds);
-  chat.setIgnoreMouseEvents(true);   // 채팅 칸 밖은 클릭 통과 (칸 위에서만 받음)
-}
-function uncover() {
-  if (!covering) return;
-  covering = null;
-  post(wins.chat, 'cover', null);
-  layoutAll();
-}
-
-// 전체화면 창이 다시 앞에 온 뒤에 작업 표시줄을 되돌려야 안 깜빡임. 그새 다시 입력 중이면 그대로 둠
-function restoreTaskbarsLater() {
-  setTimeout(() => {
-    const c = wins.chat;
-    if (!c || c.isDestroyed() || !c.isFocused()) restoreTaskbars();
-  }, 150);
 }
 
 // 입력을 끝내면 게임으로 포커스를 돌려주고 다시 클릭 통과
@@ -526,8 +481,6 @@ function endTyping() {
   chat.setFocusable(false);   // 평소에는 포커스를 못 가져가게 (다른 프로그램 단축키·작업 표시줄 문제 방지)
   if (hadFocus && !restoreForeground(prevForeground)) chat.blur();
   prevForeground = null;
-  uncover();
-  restoreTaskbarsLater();
 }
 
 // 입력창에 "어느 채널로 보내는지" 표시. 채널을 따로 정하지 않았으면 볼 수 있는 첫 채팅 채널
@@ -659,8 +612,6 @@ app.whenReady().then(() => {
 
   // 게임 쪽을 누르면 입력창에서 빠져나옴 → 다시 클릭 통과
   wins.chat.on('blur', () => { if (!wins.chat.isDestroyed()) { wins.chat.setIgnoreMouseEvents(true); wins.chat.setFocusable(false); } });
-  wins.chat.on('focus', guardTaskbar);   // 마우스로 입력창을 눌렀을 때도
-  wins.chat.on('blur', () => { uncover(); restoreTaskbarsLater(); });
 
   Promise.all(Object.values(wins).map((w) => new Promise((r) => w.webContents.once('did-finish-load', r)))).then(() => {
     sendSettings();
@@ -785,7 +736,7 @@ app.whenReady().then(() => {
   // 채팅 말풍선 위에 마우스가 있는 동안만 휠을 받음 (포커스는 안 가져감 → 게임·작업 표시줄 그대로)
   ipcMain.on('set-hover', (e, on) => {
     const win = BrowserWindow.fromWebContents(e.sender);
-    if (!win || win !== wins.chat || (win.isFocused() && !covering)) return;
+    if (!win || win !== wins.chat || win.isFocused()) return;
     win.setIgnoreMouseEvents(!on);
   });
   // 채팅 글 속 링크: http/https 만 브라우저로
@@ -799,11 +750,10 @@ app.whenReady().then(() => {
 app.on('second-instance', () => openSettings(settingsDeps));
 
 app.on('before-quit', () => { quitting = true; });
-process.on('exit', () => { try { restoreTaskbars(); } catch {} try { unstyle(); } catch {} });   // 숨긴 작업 표시줄·투명하게 만든 팝업은 무슨 일이 있어도 되돌림   // 숨긴 작업 표시줄은 무슨 일이 있어도 되돌림
+process.on('exit', () => { try { unstyle(); } catch {} });   // 투명하게 만든 방송 팝업은 무슨 일이 있어도 되돌림
 
 app.on('will-quit', () => {
-  unstyle();   // 팝업 투명도·잘라낸 위 줄 되돌리기
-  restoreTaskbars();
+  unstyle();   // 팝업 투명도 되돌리기
   globalShortcut.unregisterAll();
   feed && feed.stop();
   tunnel && tunnel.stop();
