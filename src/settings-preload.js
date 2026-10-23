@@ -5,6 +5,7 @@ contextBridge.exposeInMainWorld('settingsApi', {
   preview: (partial) => ipcRenderer.invoke('settings:preview', partial),
   save: (partial) => ipcRenderer.invoke('settings:save', partial),
   close: () => ipcRenderer.invoke('settings:close'),
+  quit: () => ipcRenderer.invoke('settings:quit'),
   onConnection: (cb) => ipcRenderer.on('connection', (_e, c) => cb(c)),
   onTunnel: (cb) => ipcRenderer.on('tunnel', (_e, t) => cb(t)),
   pickKey: () => ipcRenderer.invoke('settings:pick-key'),

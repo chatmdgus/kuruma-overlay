@@ -523,6 +523,7 @@ $('setup-done').onclick = async () => {
   flash('main-msg', '저장함');
 };
 $('setup-back').onclick = () => showView('main');
+$('quit').onclick = () => window.settingsApi.quit();
 $('open-setup').onclick = () => { $('setup-back').hidden = false; showView('setup'); };
 
 // ---------- 업데이트 ----------

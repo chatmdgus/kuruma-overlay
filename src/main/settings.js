@@ -48,6 +48,7 @@ function setupSettings(deps) {
   });
 
   ipcMain.handle('settings:close', () => { win && win.close(); });
+  ipcMain.handle('settings:quit', () => { require('electron').app.quit(); });   // 오버레이 끄기 (앱 종료)
   ipcMain.handle('settings:login', (_e, partial) => deps.login(partial));
   ipcMain.handle('settings:logout', () => deps.logout());
   ipcMain.handle('settings:update', (_e, action) => deps.update(action));

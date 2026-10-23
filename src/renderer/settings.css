@@ -112,6 +112,8 @@ footer { display: flex; align-items: center; gap: 8px; padding: 14px 28px; borde
 .msg { margin-right: auto; color: var(--muted); font-size: 13px; }
 .msg.bad { color: var(--danger); }
 .msg.new { color: var(--accent); font-weight: 600; }
+button.quit { background: transparent; color: var(--danger); padding: 0 10px; }
+button.quit:hover { filter: none; background: rgba(255, 122, 122, 0.12); }
 
 /* 디스코드 계정 */
 .account { display: flex; align-items: center; gap: 12px; padding: 8px 0 4px; }
