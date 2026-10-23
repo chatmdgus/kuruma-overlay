@@ -13,30 +13,43 @@ function applySettings() {
 
 const natural = (el) => (el.tagName === 'VIDEO' ? [el.videoWidth, el.videoHeight] : [el.naturalWidth, el.naturalHeight]);
 
-function layout() {
-  const items = [...stage.children].filter((el) => !el.classList.contains('leaving'));
-  if (!items.length) return;
-  const W = stage.clientWidth - 16;
-  const H = stage.clientHeight - 16;
-  const portraitBox = W < H * 0.9;
-  // 세로가 긴 창이면 위아래로, 넓은 창이면 옆으로 나란히
-  const vertical = portraitBox || items.length === 1;
-  const n = items.length;
-  stage.classList.toggle('row', !vertical);
-  // 각 장을 칸 하나를 다 쓰는 크기로 잡은 뒤, 합이 넘치면 같은 비율로 줄임 → 세로 사진은 세로로 길게 쓸 수 있음
-  const sizes = items.map((el) => {
-    const [nw, nh] = natural(el);
-    if (!nw || !nh) return null;
-    const s0 = Math.min(vertical ? W / nw : H / nh, vertical ? H / nh : W / nw, MAX_UPSCALE);
+// 위아래로 쌓기 / 옆으로 나란히 중에서 사진이 실제로 더 크게 보이는 쪽을 고름
+// (세로 사진 여러 장은 옆으로, 가로 사진 여러 장은 위아래로)
+function fitSizes(dims, W, H, vertical) {
+  const n = dims.length;
+  const sizes = dims.map((d) => {
+    if (!d) return null;
+    const [nw, nh] = d;
+    const s0 = Math.min(W / nw, H / nh, MAX_UPSCALE);
     return [nw * s0, nh * s0];
   });
   const room = (vertical ? H : W) - GAP * (n - 1);
   const used = sizes.reduce((t, sz) => t + (sz ? sz[vertical ? 1 : 0] : 0), 0);
   const k = used > room ? room / used : 1;
+  const out = sizes.map((sz) => (sz ? [sz[0] * k, sz[1] * k] : null));
+  return { sizes: out, area: out.reduce((t, sz) => t + (sz ? sz[0] * sz[1] : 0), 0) };
+}
+
+function layout() {
+  const items = [...stage.children].filter((el) => !el.classList.contains('leaving'));
+  if (!items.length) return;
+  const W = stage.clientWidth - 16;
+  const H = stage.clientHeight - 16;
+  const dims = items.map((el) => {
+    const [nw, nh] = natural(el);
+    return nw && nh ? [nw, nh] : null;
+  });
+  const col = fitSizes(dims, W, H, true);
+  const row = fitSizes(dims, W, H, false);
+  // 비슷하면 칸 모양을 따름 (세로로 긴 칸이면 위아래)
+  const preferCol = W < H * 0.9;
+  const vertical = items.length === 1 || (preferCol ? col.area >= row.area * 0.95 : col.area > row.area * 1.05);
+  stage.classList.toggle('row', !vertical);
+  const { sizes } = vertical ? col : row;
   items.forEach((el, i) => {
     if (!sizes[i]) return;
-    el.style.width = `${Math.round(sizes[i][0] * k)}px`;
-    el.style.height = `${Math.round(sizes[i][1] * k)}px`;
+    el.style.width = `${Math.round(sizes[i][0])}px`;
+    el.style.height = `${Math.round(sizes[i][1])}px`;
   });
 }
 
