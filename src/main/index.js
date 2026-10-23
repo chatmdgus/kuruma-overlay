@@ -489,7 +489,7 @@ function coverMonitor() {
   covering = { orig };
   post(chat, 'cover', { x: orig.x - disp.bounds.x, y: orig.y - disp.bounds.y, width: orig.width, height: orig.height });
   chat.setBounds(disp.bounds);
-  chat.setIgnoreMouseEvents(true, { forward: true });   // 채팅 칸 밖은 클릭 통과 (칸 위에서만 받음)
+  chat.setIgnoreMouseEvents(true);   // 채팅 칸 밖은 클릭 통과 (칸 위에서만 받음)
 }
 function uncover() {
   if (!covering) return;
@@ -510,7 +510,7 @@ function restoreTaskbarsLater() {
 function endTyping() {
   const chat = wins.chat;
   if (!chat || chat.isDestroyed()) return;
-  chat.setIgnoreMouseEvents(true, { forward: true });
+  chat.setIgnoreMouseEvents(true);
   const hadFocus = chat.isFocused();
   chat.setFocusable(false);   // 평소에는 포커스를 못 가져가게 (다른 프로그램 단축키·작업 표시줄 문제 방지)
   if (hadFocus && !restoreForeground(prevForeground)) chat.blur();
@@ -647,7 +647,7 @@ app.whenReady().then(() => {
   for (const name of ['media', 'chat']) wins[name] = makeOverlay(path.join(__dirname, '..', 'renderer', `${name}.html`));
 
   // 게임 쪽을 누르면 입력창에서 빠져나옴 → 다시 클릭 통과
-  wins.chat.on('blur', () => { if (!wins.chat.isDestroyed()) { wins.chat.setIgnoreMouseEvents(true, { forward: true }); wins.chat.setFocusable(false); } });
+  wins.chat.on('blur', () => { if (!wins.chat.isDestroyed()) { wins.chat.setIgnoreMouseEvents(true); wins.chat.setFocusable(false); } });
   wins.chat.on('focus', () => { coverMonitor(); hideTaskbarOver(prevForeground); });   // 마우스로 입력창을 눌렀을 때도
   wins.chat.on('blur', () => { uncover(); restoreTaskbarsLater(); });
 
@@ -695,6 +695,20 @@ app.whenReady().then(() => {
   });
 
   setInterval(() => syncMirror(), 3000);
+  // 커서 위치 알려주기: 클릭 통과 창은 마우스 이벤트를 못 받아서, 0.1초마다 커서가 창 위에 있는지 보고
+  // 있으면 위치를 보내 줌 → 창이 버튼·말풍선 위인지 보고 그때만 클릭을 받음
+  // (전에는 forward 옵션을 썼는데, 그건 전역 마우스 후킹이라 앱이 잠깐 바쁘면 마우스가 끊김)
+  setInterval(() => {
+    const p = screen.getCursorScreenPoint();
+    for (const w of [wins.chat, wins.mirror, wins.gif]) {
+      if (!w || w.isDestroyed() || !w.isVisible()) continue;
+      const b = w.getBounds();
+      const inside = p.x >= b.x && p.x < b.x + b.width && p.y >= b.y && p.y < b.y + b.height;
+      if (inside) post(w, 'cursor', { x: p.x - b.x, y: p.y - b.y });
+      else if (w._cursorIn) post(w, 'cursor', null);
+      w._cursorIn = inside;
+    }
+  }, 100);
   // 팝업을 누르면 팝업이 맨 위로 올라와서 닫기 버튼을 덮음 → 1초마다 버튼 창을 다시 위로
   setInterval(() => {
     const m = wins.mirror;
@@ -748,7 +762,7 @@ app.whenReady().then(() => {
       // 입력창·링크 위에 마우스가 올라가면 클릭해서 포커스를 받을 수 있게. 그 전에 게임 창을 기억
       if (on) { prevForeground = foregroundWindow(); win.setFocusable(true); } else win.setFocusable(false);
     }
-    win.setIgnoreMouseEvents(!on, { forward: true });
+    win.setIgnoreMouseEvents(!on);
   });
   // 방송 팝업 닫기 버튼
   ipcMain.on('close-popup', (_e, id) => {
@@ -761,7 +775,7 @@ app.whenReady().then(() => {
   ipcMain.on('set-hover', (e, on) => {
     const win = BrowserWindow.fromWebContents(e.sender);
     if (!win || win !== wins.chat || (win.isFocused() && !covering)) return;
-    win.setIgnoreMouseEvents(!on, { forward: true });
+    win.setIgnoreMouseEvents(!on);
   });
   // 채팅 글 속 링크: http/https 만 브라우저로
   ipcMain.on('open-link', (_e, url) => {

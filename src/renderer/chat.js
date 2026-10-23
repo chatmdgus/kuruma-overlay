@@ -111,17 +111,23 @@ document.addEventListener('mouseup', () => {
   chat.classList.remove('dragging');
 });
 
-document.addEventListener('mousemove', (e) => {
-  if (drag || typing || e.target.closest?.('#input')) return;   // 입력창은 따로 처리 (clickable)
+function onPointer(e) {
+  if (drag || typing || e.target?.closest?.('#input')) return;   // 입력창은 따로 처리 (clickable)
   const over = overChat(e);
   setHover(over);
   clearTimeout(browseEnd);
   if (!over && browsing) browseEnd = setTimeout(stopBrowse, 700);
-});
-document.addEventListener('mouseleave', () => {
+}
+function onPointerLeave() {
   if (typing || drag) return;
   setHover(false);
   if (browsing) { clearTimeout(browseEnd); browseEnd = setTimeout(stopBrowse, 700); }
+}
+document.addEventListener('mousemove', onPointer);
+document.addEventListener('mouseleave', onPointerLeave);
+// 클릭 통과 중일 때는 메인이 알려주는 커서 위치로 (말풍선 위에 오면 휠·클릭을 받기 시작)
+document.addEventListener('overlay-cursor', (ev) => {
+  if (ev.detail) { onPointer(ev.detail); onCoveredPointer(ev.detail); } else onPointerLeave();
 });
 list.addEventListener('wheel', (e) => {
   if (typing || browsing || e.deltaY >= 0) return;
@@ -406,11 +412,12 @@ window.overlay.on('cover', (r) => {
   if (r) Object.assign(chat.style, { inset: 'auto', left: `${r.x}px`, top: `${r.y}px`, width: `${r.width}px`, height: `${r.height}px` });
   else for (const k of ['inset', 'left', 'top', 'width', 'height']) chat.style[k] = '';
 });
-document.addEventListener('mousemove', (e) => {
+function onCoveredPointer(e) {
   if (!typing || !covered) return;
   const r = chat.getBoundingClientRect();
   setHover(e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom);
-});
+}
+document.addEventListener('mousemove', onCoveredPointer);
 inputBox.addEventListener('mouseleave', () => { hover = false; });
 
 ui.bindStatus(document.getElementById('status'));

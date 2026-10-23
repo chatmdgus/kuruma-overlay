@@ -1,6 +1,6 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
-const CHANNELS = ['settings', 'message', 'message-delete', 'media', 'voice', 'connection', 'input-mode', 'edit-mode', 'reset', 'target', 'channels', 'mirror-sources', 'mirror-closers', 'cover'];
+const CHANNELS = ['settings', 'message', 'message-delete', 'media', 'voice', 'connection', 'input-mode', 'edit-mode', 'reset', 'target', 'channels', 'mirror-sources', 'mirror-closers', 'cover', 'cursor'];
 
 contextBridge.exposeInMainWorld('overlay', {
   on(channel, cb) {

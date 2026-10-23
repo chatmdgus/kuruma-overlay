@@ -19,7 +19,7 @@ function makeOverlay(htmlFile) {
     },
   });
   win.setAlwaysOnTop(true, 'screen-saver');
-  win.setIgnoreMouseEvents(true, { forward: true });
+  win.setIgnoreMouseEvents(true);   // forward 는 안 씀 (전역 마우스 후킹 → 게임 중 마우스 끊김). 커서 위치는 메인이 따로 알려줌
   win.loadFile(htmlFile);
   return win;
 }

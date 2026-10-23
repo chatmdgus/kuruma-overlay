@@ -103,10 +103,24 @@ window.ui = (() => {
   }
 
   // 클릭 통과 창에서 특정 요소만 누를 수 있게: 마우스가 올라가 있는 동안만 클릭 받기
+  const clickables = new Set();
   function clickable(el) {
     el.addEventListener('mouseenter', () => window.overlay.setClickable(true));
     el.addEventListener('mouseleave', () => window.overlay.setClickable(false));
+    clickables.add(el);
   }
+  // 메인이 0.1초마다 커서 위치를 알려줌 (클릭 통과 중엔 마우스 이벤트가 안 옴)
+  // 누를 수 있는 요소 위면 클릭을 받기 시작 → 그다음부턴 진짜 마우스 이벤트가 옴
+  let pollHit = null;
+  window.overlay.on('cursor', (p) => {
+    const el = p ? document.elementFromPoint(p.x, p.y) : null;
+    let hit = null;
+    for (const c of clickables) { if (!c.isConnected) clickables.delete(c); else if (el && c.contains(el)) hit = c; }
+    if (hit && hit !== pollHit) window.overlay.setClickable(true);
+    else if (!hit && pollHit) window.overlay.setClickable(false);
+    pollHit = hit;
+    document.dispatchEvent(new CustomEvent('overlay-cursor', { detail: p ? { target: el || document.body, clientX: p.x, clientY: p.y } : null }));
+  });
 
   window.overlay.on('edit-mode', (on) => document.body.classList.toggle('editing', on));
   window.overlay.on('settings', (s) => { if (s && s.theme && typeof applyTheme === 'function') applyTheme(s.theme); });
