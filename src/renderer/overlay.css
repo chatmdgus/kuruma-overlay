@@ -60,6 +60,9 @@ html, body {
 }
 .list::-webkit-scrollbar { display: none; }
 .list > .msg { flex: none; }
+.list > .msg:not(.old) { cursor: grab; }
+.chat.dragging, .chat.dragging * { cursor: grabbing !important; }
+.list .link { cursor: pointer; }
 .list > .msg.old { display: none; }
 /* 입력 중: 지난 기록을 펼쳐 볼 때는 바탕을 조금 진하게 */
 .chat.typing .list > .msg, .chat.browsing .list > .msg { background: rgba(var(--plate), calc(var(--bg) + 0.25)); }

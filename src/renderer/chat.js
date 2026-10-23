@@ -1,7 +1,7 @@
 // 채팅 오버레이
 // - 평소: 최근 maxLines 줄만 잠깐 보였다가 사라짐 (기록은 남겨 둠)
 // - 입력 중: 지난 기록 전체를 휠로 스크롤해서 봄, "최신으로" 버튼, 링크 클릭, @멘션
-// - 입력 안 해도 말풍선 위에서 휠을 올리면 지난 기록을 펼쳐 봄 (마우스가 나가면 평소 보기로)
+// - 입력 안 해도 말풍선 위에서 휠을 올리거나 클릭해서 위아래로 끌면 지난 기록을 펼쳐 봄 (마우스가 나가면 평소 보기로)
 const chat = document.getElementById('chat');
 const list = document.getElementById('list');
 const inputBox = document.getElementById('input');
@@ -90,15 +90,36 @@ function overChat(e) {
   const r = list.getBoundingClientRect();
   return e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom;
 }
+// 클릭한 채로 위아래로 끌어서 스크롤 (그냥 클릭만 해도 기록이 펼쳐짐)
+let drag = null;
+list.addEventListener('mousedown', (e) => {
+  if (e.button !== 0 || e.target.closest('.link')) return;
+  e.preventDefault();   // 글자 선택·포커스 이동 안 함
+  if (!typing) startBrowse();
+  drag = { y: e.clientY, top: list.scrollTop, moved: false };
+  chat.classList.add('dragging');
+});
 document.addEventListener('mousemove', (e) => {
-  if (typing || e.target.closest?.('#input')) return;   // 입력창은 따로 처리 (clickable)
+  if (!drag) return;
+  const dy = e.clientY - drag.y;
+  if (Math.abs(dy) > 3) drag.moved = true;
+  list.scrollTop = drag.top - dy;
+});
+document.addEventListener('mouseup', () => {
+  if (!drag) return;
+  drag = null;
+  chat.classList.remove('dragging');
+});
+
+document.addEventListener('mousemove', (e) => {
+  if (drag || typing || e.target.closest?.('#input')) return;   // 입력창은 따로 처리 (clickable)
   const over = overChat(e);
   setHover(over);
   clearTimeout(browseEnd);
   if (!over && browsing) browseEnd = setTimeout(stopBrowse, 700);
 });
 document.addEventListener('mouseleave', () => {
-  if (typing) return;
+  if (typing || drag) return;
   setHover(false);
   if (browsing) { clearTimeout(browseEnd); browseEnd = setTimeout(stopBrowse, 700); }
 });
