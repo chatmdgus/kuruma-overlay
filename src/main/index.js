@@ -136,27 +136,35 @@ function arrangeWindows(list, cfg = config.get(), force = false) {
   });
 }
 
-// 16:9 화면이 가장 크게 들어가는 칸 나누기 (넓은 칸이면 옆으로, 좁으면 위아래)
+// 16:9 방송이 가장 크게 들어가는 칸 나누기. 창은 칸을 꽉 채우지 않고 영상 비율(+제목 줄)에 딱 맞춰서
+// 검은 여백이 안 생기게 함. 묶음은 위·가운데 정렬 (남는 곳은 투명하게 비워 둠)
+const POPUP_TITLE = 32;   // 디스코드 팝업 위쪽 제목 줄 높이 (DIP)
 function gridCells(n, area, gap) {
-  let best = { cols: 1, score: 0 };
-  for (let cols = 1; cols <= n; cols++) {
+  const fit = (cols) => {
     const rows = Math.ceil(n / cols);
     const cw = (area.width - gap * (cols - 1)) / cols;
     const ch = (area.height - gap * (rows - 1)) / rows;
-    const w = Math.min(cw, ch * 16 / 9);
-    const score = w * w;
-    if (score > best.score * 1.01 || (score > best.score * 0.99 && area.width > area.height * 1.5)) best = { cols, score };
+    const w = Math.max(0, Math.min(cw, (ch - POPUP_TITLE) * 16 / 9));
+    return { cols, rows, w, h: w * 9 / 16 + POPUP_TITLE };
+  };
+  let best = fit(1);
+  for (let cols = 2; cols <= n; cols++) {
+    const f = fit(cols);
+    if (f.w > best.w * 1.01) best = f;
   }
-  const cols = best.cols;
-  const rows = Math.ceil(n / cols);
-  const cw = (area.width - gap * (cols - 1)) / cols;
-  const ch = (area.height - gap * (rows - 1)) / rows;
-  return Array.from({ length: n }, (_, i) => ({
-    x: Math.round(area.x + (i % cols) * (cw + gap)),
-    y: Math.round(area.y + Math.floor(i / cols) * (ch + gap)),
-    width: Math.round(cw),
-    height: Math.round(ch),
-  }));
+  const { cols, rows, w, h } = best;
+  const top = area.y;   // 위에 붙이고 남는 곳은 아래로 몰아서 비워 둠
+  return Array.from({ length: n }, (_, i) => {
+    const row = Math.floor(i / cols);
+    const inRow = row === rows - 1 ? n - row * cols : cols;   // 마지막 줄이 덜 차면 그 줄도 가운데로
+    const left = area.x + (area.width - (inRow * w + gap * (inRow - 1))) / 2;
+    return {
+      x: Math.round(left + (i % cols) * (w + gap)),
+      y: Math.round(top + row * (h + gap)),
+      width: Math.round(w),
+      height: Math.round(h),
+    };
+  });
 }
 
 function chatOnTop() {
