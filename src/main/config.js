@@ -18,7 +18,7 @@ const DEFAULTS = {
   monitors: { main: null, sub: null },
   appearance: { bgOpacity: 0.45, hideOnDiscord: true },   // hideOnDiscord: 디스코드 창이 맨 앞이면 숨김
   overlays: {
-    chat: { enabled: true, monitor: 'sub', rect: { x: 0.74, y: 0.34, w: 0.245, h: 0.62 }, rectTall: { x: 0.53, y: 0.52, w: 0.45, h: 0.45 }, fadeSec: 10, maxLines: 8, fontSize: 15 },
+    chat: { enabled: true, monitor: 'sub', inputOn: true, rect: { x: 0.74, y: 0.34, w: 0.245, h: 0.62 }, rectTall: { x: 0.53, y: 0.52, w: 0.45, h: 0.45 }, fadeSec: 10, maxLines: 8, fontSize: 15 },
     media: { enabled: true, monitor: 'sub', rect: { x: 0.505, y: 0.34, w: 0.225, h: 0.62 }, rectTall: { x: 0.08, y: 0.52, w: 0.43, h: 0.45 }, fadeSec: 8, maxItems: 3 },
     // 음성은 디스코드 기본 오버레이와 같이 쓰는 걸 기본으로 해서 꺼둠 (설정에서 켤 수 있음)
     // 내 GIF: 고른 이미지를 화면에 계속 띄움 (파일은 설정 폴더 gif/ 에 복사해 둠)

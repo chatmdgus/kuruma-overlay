@@ -37,7 +37,7 @@ npm.cmd run dist
 - 서버 주인은 SSH 터널을 켜면 앱이 켜질 때 터널을 같이 엶 (키 파일 지정)
 - 평소 설정은 트레이 아이콘
 
-- 입력 모드: `Ctrl+Shift+D` → 입력 후 Enter 전송, Esc 취소
+- 채팅 입력창: 기본으로 켜져 있음. 입력창을 눌러서 치고 Enter 전송, Esc로 게임으로 돌아감. `Ctrl+Shift+D`로 입력창 켜기/끄기(켤 때 바로 입력 가능)
 - 설정: 트레이 아이콘 → 연결, 모니터, 배치, 글자 크기, 배경 진하기 등
 - 설정 파일: `%APPDATA%/kuruma-overlay/config.json`
 

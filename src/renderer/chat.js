@@ -4,7 +4,7 @@ const inputBox = document.getElementById('input');
 const text = document.getElementById('text');
 
 let settings = { fadeSec: 10, maxLines: 8, fontSize: 15, bgOpacity: 0.45 };
-let inputMode = false;
+let typing = false;   // 입력창에 커서가 있는 동안은 메시지가 안 사라짐
 
 function applySettings() {
   chat.style.setProperty('--fs', `${settings.fontSize}px`);
@@ -14,7 +14,7 @@ function applySettings() {
 
 function scheduleFade(row) {
   clearTimeout(row._timer);
-  if (!settings.fadeSec || inputMode) return;
+  if (!settings.fadeSec || typing) return;
   row._timer = setTimeout(() => {
     row.classList.add('gone');
     setTimeout(() => row.remove(), 500);
@@ -54,27 +54,39 @@ window.overlay.on('message-delete', (id) => list.querySelector(`[data-id="${CSS.
 window.overlay.on('reset', () => list.replaceChildren());
 // 입력창: 어느 채널로 보내는지
 window.overlay.on('target', (ch) => {
-  text.placeholder = ch ? `#${ch}에 보내기 · Enter 보내기 · Esc 닫기` : '메시지 입력 · Enter 보내기 · Esc 닫기';
+  text.placeholder = ch ? `#${ch}에 메시지 보내기` : '메시지 보내기';
 });
 
-window.overlay.on('input-mode', (on) => {
-  inputMode = on;
+// 입력창 켜기/끄기 (단축키). 켤 때는 바로 칠 수 있게 커서를 넣음
+window.overlay.on('input-mode', ({ on, focus }) => {
   inputBox.classList.toggle('on', on);
+  if (!on) text.blur();
+  else if (focus) text.focus();
+});
+
+// 커서가 들어오면 지난 메시지를 다시 보여주고, 나가면 다시 사라지게
+function setTyping(on) {
+  typing = on;
+  inputBox.classList.toggle('typing', on);
   for (const row of list.children) {
     row.classList.remove('gone');
     if (on) clearTimeout(row._timer); else scheduleFade(row);
   }
-  if (on) { text.value = ''; text.focus(); }
-});
+}
+text.addEventListener('focus', () => setTyping(true));
+text.addEventListener('blur', () => { setTyping(false); window.overlay.endInput(); });
 
 text.addEventListener('keydown', (e) => {
   if (e.key === 'Enter' && !e.isComposing) {
     e.preventDefault();
-    window.overlay.send(text.value);
+    if (text.value.trim()) window.overlay.send(text.value);
+    text.value = '';
   } else if (e.key === 'Escape') {
-    window.overlay.endInput();
+    text.blur();
   }
 });
+// 클릭 통과 창이라 입력창 위에 마우스가 있을 때만 클릭을 받음
+ui.clickable(inputBox);
 
 ui.bindStatus(document.getElementById('status'));
 applySettings();

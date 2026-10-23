@@ -21,11 +21,12 @@ let feed = null;
 let feedKey = '';
 let connection = { state: 'setup' };
 const channelNames = new Map();   // 채널 ID → 이름 (서버의 ready 메시지에서 받음)
-let sendChannelId = null;         // 오버레이에서 쓴 글을 보낼 채널
+let sendChannelId = null;
+let lastMsgTs = 0;                // 마지막으로 글이 올라온 시각 (그 채널로 답장)         // 오버레이에서 쓴 글을 보낼 채널
 let tunnel = null;
 let tunnelKey = '';
 let tunnelState = { state: 'off' };
-let inputMode = false;
+let inputOn = true;        // 채팅 입력창이 보이는지 (단축키로 켜고 끔, 기본은 켜짐)
 let userHidden = false;
 let registeredHotkey = null;
 let quitting = false;
@@ -85,7 +86,7 @@ function sendSettings(cfg = config.get()) {
 function registerHotkey(cfg = config.get()) {
   if (registeredHotkey === cfg.hotkeys.input) return;
   if (registeredHotkey) globalShortcut.unregister(registeredHotkey);
-  registeredHotkey = globalShortcut.register(cfg.hotkeys.input, () => setInputMode(!inputMode)) ? cfg.hotkeys.input : null;
+  registeredHotkey = globalShortcut.register(cfg.hotkeys.input, () => toggleInput()) ? cfg.hotkeys.input : null;
 }
 
 function setConnection(c) {
@@ -163,14 +164,31 @@ function setEditMode(on) {
   layoutAll();
 }
 
-function setInputMode(on) {
-  if (on && (userHidden || !config.get().overlays.chat.enabled)) return;
-  inputMode = on;
+// 입력창 보이기/숨기기. 보이는 동안은 입력창 위에 마우스를 올리면 클릭해서 바로 칠 수 있음
+function setInputOn(on, { focus = false, save = true } = {}) {
+  inputOn = on;
   const chat = wins.chat;
+  if (!chat || chat.isDestroyed()) return;
   chat.setFocusable(on);
-  chat.setIgnoreMouseEvents(!on, { forward: true });
-  if (on) chat.focus();
-  post(chat, 'input-mode', on);
+  if (!on) endTyping();
+  post(chat, 'input-mode', { on, focus });
+  if (on && focus && !userHidden && config.get().overlays.chat.enabled) {
+    chat.setIgnoreMouseEvents(false);
+    chat.focus();
+  }
+  if (save) config.save({ overlays: { chat: { inputOn: on } } });
+}
+
+function toggleInput() {
+  setInputOn(!inputOn, { focus: !inputOn });
+}
+
+// 입력을 끝내면 게임으로 포커스를 돌려주고 다시 클릭 통과
+function endTyping() {
+  const chat = wins.chat;
+  if (!chat || chat.isDestroyed()) return;
+  chat.setIgnoreMouseEvents(true, { forward: true });
+  if (chat.isFocused()) chat.blur();
 }
 
 // 입력창에 "어느 채널로 보내는지" 표시. 채널을 따로 정하지 않았으면 볼 수 있는 첫 채팅 채널
@@ -191,10 +209,17 @@ function emit(type, payload) {
         mediaOnly: !payload.content && media.length > 0,
       });
       for (const m of media) post(wins.media, 'media', m);
+      // 채널을 따로 정하지 않았으면 마지막으로 글이 올라온 채널로 보냄 (입력 중에는 안 바꿈)
+      if (!MOCK && !config.get().subscribe.channelIds.length && (payload.ts || 0) > lastMsgTs && channelNames.has(payload.channelId) && !wins.chat.isFocused()) {
+        lastMsgTs = payload.ts;
+        sendChannelId = payload.channelId;
+        post(wins.chat, 'target', channelNames.get(sendChannelId));
+      }
       break;
     }
     case 'ready': {
       channelNames.clear();
+      lastMsgTs = 0;
       for (const g of payload.guilds || []) for (const c of g.channels || []) if (c.type !== 'voice') channelNames.set(c.id, c.name);
       sendTarget();
       break;
@@ -262,8 +287,12 @@ app.whenReady().then(() => {
     wins[name] = makeOverlay(path.join(__dirname, '..', 'renderer', `${name}.html`));
   }
 
+  // 게임 쪽을 누르면 입력창에서 빠져나옴 → 다시 클릭 통과
+  wins.chat.on('blur', () => { if (!wins.chat.isDestroyed()) wins.chat.setIgnoreMouseEvents(true, { forward: true }); });
+
   Promise.all(Object.values(wins).map((w) => new Promise((r) => w.webContents.once('did-finish-load', r)))).then(() => {
     sendSettings();
+    setInputOn(config.get().overlays.chat.inputOn !== false, { save: false });
     syncTunnel();
     if (config.get().launch.atLogin) syncLaunch();   // 설치 위치가 바뀌었을 수 있어서 다시 등록
     startFeed();
@@ -279,7 +308,7 @@ app.whenReady().then(() => {
   // 디스코드가 맨 앞에 있으면 오버레이 숨기기 (설정에서 끌 수 있음)
   watchForeground((front) => {
     discordFront = front;
-    if (front && config.get().appearance.hideOnDiscord) setInputMode(false);
+    if (front && config.get().appearance.hideOnDiscord) endTyping();
     layoutAll();
   });
 
@@ -301,22 +330,21 @@ app.whenReady().then(() => {
   trayApi = createTray({
     getUpdate: () => updater?.get(),
     onUpdate: (action) => settingsDeps.update(action),
-    onToggle: (visible) => { userHidden = !visible; if (userHidden) setInputMode(false); layoutAll(); },
+    onToggle: (visible) => { userHidden = !visible; if (userHidden) endTyping(); layoutAll(); },
     onSettings: () => openSettings(settingsDeps),
     onQuit: () => app.quit(),
   });
 
   ipcMain.on('send', (_e, content) => {
     const text = String(content || '').trim().slice(0, 2000);
-    if (text && feed && sendChannelId) feed.send(text, sendChannelId);
-    setInputMode(false);
+    if (text && feed && sendChannelId) feed.send(text, sendChannelId);   // 보내고 나서도 입력창은 그대로 (이어서 칠 수 있게)
   });
-  ipcMain.on('end-input', () => setInputMode(false));
+  ipcMain.on('end-input', () => endTyping());
   ipcMain.on('open-settings', () => openSettings(settingsDeps));
   // 설정 버튼 위에 마우스가 있는 동안만 클릭을 받음 (채팅 입력 모드 중인 채팅 창은 건드리지 않음)
   ipcMain.on('set-clickable', (e, on) => {
     const win = BrowserWindow.fromWebContents(e.sender);
-    if (!win || (win === wins.chat && inputMode)) return;
+    if (!win || (win === wins.chat && win.isFocused())) return;   // 입력 중에는 클릭 받는 상태 유지
     win.setIgnoreMouseEvents(!on, { forward: true });
   });
 });

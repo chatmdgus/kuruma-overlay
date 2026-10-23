@@ -71,10 +71,13 @@ html, body {
   width: 100%; box-sizing: border-box;
   height: 2.3em; padding: 0 1em;
   font: inherit; color: var(--ink);
-  background: rgba(var(--plate), 0.88);
-  border: 1px solid var(--accent); border-radius: 1.15em;
+  background: rgba(var(--plate), calc(var(--bg) + 0.2));
+  border: 1px solid var(--edge); border-radius: 1.15em;
   outline: none;
+  transition: border-color 0.2s, background 0.2s, box-shadow 0.2s;
 }
+.input input:hover { border-color: rgba(255, 107, 122, 0.5); }
+.input.typing input { background: rgba(var(--plate), 0.9); border-color: var(--accent); box-shadow: 0 0 0 3px rgba(255, 107, 122, 0.18); }
 .input input::placeholder { color: var(--ink-soft); }
 
 /* ── 미디어 ───────────────────────── */
