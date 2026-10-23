@@ -31,6 +31,7 @@ function setupSettings(deps) {
       mock: deps.isMock(),
       update: deps.getUpdate(),
       channels: deps.getChannels(),
+      hotkey: deps.getHotkey(),
     };
   });
 
@@ -50,6 +51,7 @@ function setupSettings(deps) {
   ipcMain.handle('settings:login', (_e, partial) => deps.login(partial));
   ipcMain.handle('settings:logout', () => deps.logout());
   ipcMain.handle('settings:update', (_e, action) => deps.update(action));
+  ipcMain.handle('settings:test-hotkey', (_e, accel) => deps.testHotkey(String(accel || '')));
 
   // 내 GIF 고르기: 원본을 옮기거나 지워도 계속 보이게 설정 폴더에 복사해 둠
   ipcMain.handle('settings:pick-gif', async () => {

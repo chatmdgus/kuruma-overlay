@@ -89,7 +89,26 @@ function sendSettings(cfg = config.get()) {
 function registerHotkey(cfg = config.get()) {
   if (registeredHotkey === cfg.hotkeys.input) return;
   if (registeredHotkey) globalShortcut.unregister(registeredHotkey);
-  registeredHotkey = globalShortcut.register(cfg.hotkeys.input, () => toggleInput()) ? cfg.hotkeys.input : null;
+  let ok = false;
+  try { ok = globalShortcut.register(cfg.hotkeys.input, () => toggleInput()); } catch { ok = false; }
+  registeredHotkey = ok ? cfg.hotkeys.input : null;
+  notifySettings('hotkey', { accel: cfg.hotkeys.input, ok });
+}
+
+// 설정 창에서 새 단축키를 누르면: 다른 프로그램이 이미 쓰고 있는지 확인
+function testHotkey(accel) {
+  if (accel === registeredHotkey) return true;
+  try {
+    if (!globalShortcut.register(accel, () => {})) return false;
+    globalShortcut.unregister(accel);
+    return true;
+  } catch { return false; }
+}
+
+// 설정에서 입력창 켜기/끄기를 바꿨으면 바로 반영
+function syncInputOn(cfg) {
+  const want = cfg.overlays.chat.inputOn !== false;
+  if (want !== inputOn) setInputOn(want, { save: false });
 }
 
 function setConnection(c) {
@@ -156,6 +175,7 @@ function applyConfig(cfg) {
   layoutAll(cfg);
   sendSettings(cfg);
   registerHotkey(cfg);
+  syncInputOn(cfg);
   syncTunnel(cfg);
   syncLaunch(cfg);
   startFeed(cfg);
@@ -180,6 +200,7 @@ function setInputOn(on, { focus = false, save = true } = {}) {
     chat.focus();
   }
   if (save) config.save({ overlays: { chat: { inputOn: on } } });
+  notifySettings('input', on);
 }
 
 function toggleInput() {
@@ -266,6 +287,8 @@ const settingsDeps = {
   isQuitting: () => quitting,
   getUpdate: () => updater?.get() || null,
   getChannels: () => channelList,
+  getHotkey: () => ({ accel: config.get().hotkeys.input, ok: registeredHotkey === config.get().hotkeys.input }),
+  testHotkey,
   update: (action) => { if (action === 'install') updater?.install(); else updater?.check(); },
   config,
   resolveDisplay: (role) => resolveDisplay(role),
@@ -277,6 +300,7 @@ const settingsDeps = {
     const merged = config.merge(config.get(), partial);
     layoutAll(merged);
     sendSettings(merged);
+    syncInputOn(merged);
   },
   setEditMode,
   // 처음 설정 화면의 "디스코드로 로그인"

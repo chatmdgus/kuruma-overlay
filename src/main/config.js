@@ -25,7 +25,7 @@ const DEFAULTS = {
     gif: { enabled: false, monitor: 'main', rect: { x: 0.84, y: 0.66, w: 0.14, h: 0.3 }, rectTall: { x: 0.6, y: 0.05, w: 0.36, h: 0.18 }, file: '', name: '', opacity: 1 },
     voice: { enabled: false, monitor: 'main', rect: { x: 0.008, y: 0.015, w: 0.15, h: 0.42 }, rectTall: { x: 0.01, y: 0.01, w: 0.27, h: 0.24 }, scale: 1.25, gap: 6, showControls: true },
   },
-  hotkeys: { input: 'CommandOrControl+Shift+D' },
+  hotkeys: { input: 'CommandOrControl+Shift+Enter' },   // 입력창 켜기/끄기 (설정에서 바꿀 수 있음)
 };
 
 let cache = null;
@@ -49,6 +49,8 @@ function get() {
     if (e.code !== 'ENOENT') console.error('[config] config.json 읽기 실패, 기본값 사용:', e.message);
   }
   cache = merge(DEFAULTS, saved);
+  // 예전 기본 단축키(Ctrl+Shift+D)를 그대로 쓰던 사람은 새 기본값으로
+  if (cache.hotkeys.input === 'CommandOrControl+Shift+D') cache.hotkeys.input = DEFAULTS.hotkeys.input;
   return cache;
 }
 

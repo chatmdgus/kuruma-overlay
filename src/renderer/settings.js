@@ -42,6 +42,7 @@ function bindSeg(id, options, get, set, { live = true } = {}) {
   const paint = () => { const i = pick(); buttons.forEach((b, j) => b.setAttribute('aria-checked', String(i === j))); };
   box.replaceChildren(...buttons);
   paint();
+  box._paint = paint;
   return paint;
 }
 
@@ -189,6 +190,8 @@ function fillMain() {
   });
   $('enabled').replaceChildren(...chips);
 
+  bindSeg('chat-input', ONOFF, () => o.chat.inputOn !== false, (v) => { o.chat.inputOn = v; });
+  paintHotkey();
   bindSeg('chat-size', SIZE3([13, 15, 18]), () => o.chat.fontSize, (v) => { o.chat.fontSize = v; });
   bindSeg('chat-fade', [5, 10, 15, 30].map((v) => ({ label: `${v}초`, value: v })).concat({ label: '안 사라짐', value: 0 }), () => o.chat.fadeSec, (v) => { o.chat.fadeSec = v; });
   bindSeg('chat-lines', [5, 8, 12].map((v) => ({ label: `${v}줄`, value: v })), () => o.chat.maxLines, (v) => { o.chat.maxLines = v; });
@@ -238,6 +241,55 @@ function settingsAccent(key) {
   r.setProperty('--accent-ink', t.accentInk);
   r.setProperty('--accent-rgb', hexRgb(t.accent));
   r.setProperty('--chat', t.accent);
+}
+
+// ---------- 단축키 ----------
+const prettyKey = (a) => (a || '').replace('CommandOrControl', 'Ctrl').replace(/\+/g, ' + ');
+let hotkeyOk = true;
+function paintHotkey(note) {
+  $('hotkey').textContent = prettyKey(state.hotkeys?.input);
+  $('hk-note').textContent = note || (hotkeyOk ? '눌러서 새 단축키를 정함 · Esc 취소' : '⚠ 다른 프로그램이 이 단축키를 쓰고 있어요. 다른 걸로 바꿔 주세요');
+  $('hk-note').classList.toggle('bad', !note && !hotkeyOk);
+  $('main-msg').textContent = `채팅 입력창 켜기/끄기: ${prettyKey(state.hotkeys?.input)}`;
+}
+const CODE_KEYS = { Space: 'Space', Enter: 'Enter', Tab: 'Tab', Backquote: '`', Minus: '-', Equal: '=', BracketLeft: '[', BracketRight: ']',
+  Backslash: '\\', Semicolon: ';', Quote: "'", Comma: ',', Period: '.', Slash: '/', ArrowUp: 'Up', ArrowDown: 'Down', ArrowLeft: 'Left', ArrowRight: 'Right',
+  Home: 'Home', End: 'End', PageUp: 'PageUp', PageDown: 'PageDown', Insert: 'Insert', Delete: 'Delete' };
+function keyOf(e) {
+  if (/^Key[A-Z]$/.test(e.code)) return e.code.slice(3);
+  if (/^Digit\d$/.test(e.code)) return e.code.slice(5);
+  if (/^Numpad\d$/.test(e.code)) return 'num' + e.code.slice(6);
+  if (/^F\d{1,2}$/.test(e.code)) return e.code;
+  return CODE_KEYS[e.code] || null;
+}
+let capturing = null;
+$('hotkey').onclick = () => {
+  if (capturing) return;
+  $('hotkey').classList.add('rec');
+  $('hotkey').textContent = '키를 누르세요…';
+  capturing = async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.key === 'Escape') return endCapture();
+    const key = keyOf(e);
+    if (!key) return;   // Ctrl·Shift·Alt 만 누른 상태
+    const mods = [e.ctrlKey && 'CommandOrControl', e.altKey && 'Alt', e.shiftKey && 'Shift'].filter(Boolean);
+    if (!mods.length && !/^F\d/.test(key)) return paintHotkey('Ctrl·Alt 중 하나와 같이 눌러 주세요 (F키는 혼자도 됨)');
+    const accel = [...mods, key].join('+');
+    const ok = await window.settingsApi.testHotkey(accel);
+    endCapture();
+    if (!ok) return paintHotkey(`${prettyKey(accel)}는 다른 프로그램이 쓰고 있어요`);
+    state.hotkeys = { ...state.hotkeys, input: accel };
+    hotkeyOk = true;
+    paintHotkey('저장하면 바뀌어요');
+  };
+  window.addEventListener('keydown', capturing, true);
+};
+function endCapture() {
+  window.removeEventListener('keydown', capturing, true);
+  capturing = null;
+  $('hotkey').classList.remove('rec');
+  paintHotkey();
 }
 
 // ---------- 배치 무대 ----------
@@ -431,6 +483,7 @@ const savable = () => ({
   ssh: state.ssh,
   launch: state.launch,
   monitors: state.monitors,
+  hotkeys: state.hotkeys,
   overlays: state.overlays,
   appearance: state.appearance,
 });
@@ -438,7 +491,7 @@ const savable = () => ({
 function flash(id, text) {
   $(id).textContent = text;
   clearTimeout(flash[id]);
-  flash[id] = setTimeout(() => { $(id).textContent = id === 'main-msg' ? '채팅 입력은 Ctrl+Shift+D' : ''; }, 2500);
+  flash[id] = setTimeout(() => { if (id === 'main-msg') paintHotkey(); else $(id).textContent = ''; }, 2500);
 }
 
 $('setup-done').onclick = async () => {
@@ -594,6 +647,9 @@ window.addEventListener('resize', () => state && render());
   showUpdate(res.update);
   window.settingsApi.onUpdate(showUpdate);
   channelList = res.channels || [];
+  hotkeyOk = res.hotkey?.ok !== false;
+  window.settingsApi.onHotkey((h) => { hotkeyOk = !!h?.ok; paintHotkey(); });
+  window.settingsApi.onInput((on) => { state.overlays.chat.inputOn = on; const seg = $('chat-input'); seg && seg._paint && seg._paint(); });
   window.settingsApi.onChannels((list) => { channelList = list || []; fillChannels(); });
 
   fillSetup();
