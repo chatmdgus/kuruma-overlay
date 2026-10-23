@@ -56,11 +56,46 @@ function resolveDisplay(role, cfg = config.get()) {
 
 const mirrorShown = (cfg) => ((cfg.overlays.mirror.show || 'arrange') === 'arrange' ? closers.length > 0 && !popupsDown : mirrorKey !== '[]');
 
+const LAZY = ['gif', 'mirror'];
+function ensureWin(name) {
+  if (wins[name] && !wins[name].isDestroyed()) return wins[name];
+  const w = makeOverlay(path.join(__dirname, '..', 'renderer', `${name}.html`));
+  wins[name] = w;
+  w.webContents.once('did-finish-load', () => {
+    if (w.isDestroyed()) return;
+    sendSettings();
+    post(w, 'connection', connection);
+    post(w, 'edit-mode', editing);
+    if (name === 'mirror') { post(w, 'mirror-closers', closers); mirrorKey = '[]'; syncMirror().catch(() => {}); }
+    layoutAll(lastLayoutCfg || config.get());
+    restack();
+  });
+  return w;
+}
+function dropWin(name) {
+  const w = wins[name];
+  if (w && !w.isDestroyed()) w.destroy();
+  delete wins[name];
+}
+// 겹치는 순서: GIF < 방송 썸네일 < 방송 화면(닫기 버튼) < 사진 < 채팅
+const stackOrder = () => [wins.gif, thumbsWin, wins.mirror, wins.media, wins.chat].filter((w) => w && !w.isDestroyed());
+function restack() {
+  for (const w of stackOrder()) if (w.isVisible()) w.moveTop();
+}
+
+let lastLayoutCfg = null;   // 설정 창 미리보기 중이면 저장 안 한 설정 (새로 만든 창이 열렸을 때 이걸로 다시 배치)
 function layoutAll(cfg = config.get()) {
   if (quitting) return;
-  for (const [name, win] of Object.entries(wins)) {
-    if (win.isDestroyed()) continue;
+  lastLayoutCfg = cfg;
+  for (const name of ['gif', 'mirror', 'media', 'chat']) {   // 음성 오버레이는 안 씀 (창도 안 만듦)
     const o = cfg.overlays[name];
+    // GIF·방송 화면 창은 켜 둘 때만 만들고, 끄면 없애서 메모리를 아낌
+    if (LAZY.includes(name)) {
+      if (!o.enabled) { dropWin(name); continue; }
+      if (!wins[name] || wins[name].isDestroyed()) { ensureWin(name); continue; }   // 다 열리면 다시 배치
+    }
+    const win = wins[name];
+    if (!win || win.isDestroyed()) continue;
     // 음성 오버레이는 쓰지 않음 (디스코드 기본 오버레이 사용)
     const hideForDiscord = discordFront && cfg.appearance.hideOnDiscord;
     const noGif = (name === 'gif' && !o.file && !editing)   // GIF 를 아직 안 골랐으면 숨김 (배치 중엔 자리 표시)
@@ -200,6 +235,7 @@ function unstyle(keepIds = []) {
     if (Number.isFinite(n) && windowAlive(n)) { clipTop(n, 0); setOpacity(n, 1); }
     styled.delete(id);
   }
+  if (!thumbs.size && thumbsWin && !thumbsWin.isDestroyed()) { thumbsWin.destroy(); thumbsWin = null; }   // 팝업이 없으면 썸네일 창도 없앰
   syncThumbsWin();
 }
 // 썸네일 창은 방송 화면 창이 보일 때만 (디스코드가 맨 앞일 때·숨기기 등은 같이 숨김)
@@ -210,11 +246,7 @@ function syncThumbsWin() {
   if (show) { thumbsWin.setBounds(m.getBounds()); if (!thumbsWin.isVisible()) thumbsWin.showInactive(); }
   else if (thumbsWin.isVisible()) thumbsWin.hide();
 }
-function overlaysOnTop() {
-  if (thumbsWin && !thumbsWin.isDestroyed() && thumbsWin.isVisible()) thumbsWin.moveTop();
-  if (wins.mirror && !wins.mirror.isDestroyed() && wins.mirror.isVisible()) wins.mirror.moveTop();   // 닫기 버튼이 맨 위
-  chatOnTop();
-}
+const overlaysOnTop = () => restack();
 
 function arrangeWindows(list, cfg = config.get(), force = false) {
   const o = cfg.overlays.mirror;
@@ -233,6 +265,7 @@ function arrangeWindows(list, cfg = config.get(), force = false) {
   const ox = Math.round(area.x), oy = Math.round(area.y);
   setClosers(list.map((w, i) => ({ id: w.id, x: cells[i].x - ox, y: cells[i].y - oy, width: cells[i].width, height: cells[i].height })));
   // 썸네일 창 = 방송 화면 창과 같은 자리
+  if (T > 0 && (!thumbsWin || thumbsWin.isDestroyed())) thumbsWin = makeOverlay(path.join(__dirname, '..', 'renderer', 'thumbs.html'));   // 팝업이 있을 때만 만듦
   const useThumb = T > 0 && thumbsWin && !thumbsWin.isDestroyed();
   if (useThumb) { thumbsWin.setBounds({ x: ox, y: oy, width: Math.max(80, Math.round(area.width)), height: Math.max(60, Math.round(area.height)) }); }
   const origin = useThumb ? screen.dipToScreenRect(null, thumbsWin.getBounds()) : null;
@@ -610,10 +643,8 @@ const settingsDeps = {
 };
 
 app.whenReady().then(() => {
-  for (const name of ['gif', 'mirror', 'media', 'chat', 'voice']) {   // 만든 순서대로 쌓임: GIF가 맨 아래
-    wins[name] = makeOverlay(path.join(__dirname, '..', 'renderer', `${name}.html`));
-  }
-  thumbsWin = makeOverlay(path.join(__dirname, '..', 'renderer', 'thumbs.html'));   // 방송 팝업 썸네일 (버튼 줄 뺀 화면)
+  // 처음엔 사진·채팅 창만 만듦. GIF·방송 화면은 켜 둘 때 layoutAll 이 만듦, 썸네일 창은 팝업이 생길 때
+  for (const name of ['media', 'chat']) wins[name] = makeOverlay(path.join(__dirname, '..', 'renderer', `${name}.html`));
 
   // 게임 쪽을 누르면 입력창에서 빠져나옴 → 다시 클릭 통과
   wins.chat.on('blur', () => { if (!wins.chat.isDestroyed()) { wins.chat.setIgnoreMouseEvents(true, { forward: true }); wins.chat.setFocusable(false); } });
@@ -653,7 +684,7 @@ app.whenReady().then(() => {
   const ownHandles = () => alive().map((w) => { const b = w.getNativeWindowHandle(); return b.length >= 8 ? b.readBigUInt64LE(0) : BigInt(b.readUInt32LE(0)); });
   setInterval(() => {
     if (foregroundIsFullscreen(ownHandles())) return;
-    alive().forEach((w) => w.setAlwaysOnTop(true, 'screen-saver'));
+    stackOrder().forEach((w) => w.setAlwaysOnTop(true, 'screen-saver'));   // 순서대로 다시 걸어서 채팅이 맨 위
   }, 5000);
 
   updater = setupUpdater((u) => {
