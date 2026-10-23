@@ -89,6 +89,25 @@ window.overlay.on('mirror-sources', (list) => {
   }
   layout();
 });
+// 팝업을 칸에 배치하는 방식: 비추지 않고 팝업마다 오른쪽 위에 작은 닫기 버튼만
+const closersEl = document.getElementById('closers');
+window.overlay.on('mirror-closers', (list) => {
+  list = list || [];
+  if (closersEl.querySelector(':hover')) window.overlay.setClickable(false);   // 마우스 올린 채로 버튼이 사라지면 클릭 통과로 되돌림
+  document.body.classList.toggle('arranged', list.length > 0);
+  closersEl.replaceChildren(...list.map((c) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'popx';
+    b.title = '이 방송 닫기';
+    b.textContent = '✕';
+    b.style.left = `${c.x + c.width - 28}px`;
+    b.style.top = `${c.y + 6}px`;
+    b.addEventListener('click', () => { window.overlay.setClickable(false); b.remove(); window.overlay.closePopup(c.id); });
+    ui.clickable(b);
+    return b;
+  }));
+});
 window.overlay.on('settings', (s) => { if (s?.fps) fps = s.fps; });
 window.addEventListener('resize', layout);
 layout();

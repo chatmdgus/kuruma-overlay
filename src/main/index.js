@@ -12,7 +12,7 @@ const { setupSettings, openSettings, notifySettings } = require('./settings');
 const { createTray } = require('./tray');
 const { startTunnel } = require('./tunnel');
 const { login, describeLoginError } = require('./login');
-const { minimizeWindow, closeWindow, hideTaskbarOver, restoreTaskbars, placeWindow, watchForeground, windowInfo, foregroundWindow, restoreForeground, foregroundIsFullscreen } = require('./foreground');
+const { setOpacity, clipTop, minimizeWindow, closeWindow, hideTaskbarOver, restoreTaskbars, placeWindow, watchForeground, windowInfo, foregroundWindow, restoreForeground, foregroundIsFullscreen } = require('./foreground');
 const { shell, desktopCapturer } = require('electron');
 const { setupUpdater } = require('./updater');
 
@@ -54,6 +54,8 @@ function resolveDisplay(role, cfg = config.get()) {
   return primary;
 }
 
+const mirrorShown = (cfg) => ((cfg.overlays.mirror.show || 'arrange') === 'arrange' ? closers.length > 0 && !popupsDown : mirrorKey !== '[]');
+
 function layoutAll(cfg = config.get()) {
   if (quitting) return;
   for (const [name, win] of Object.entries(wins)) {
@@ -62,7 +64,7 @@ function layoutAll(cfg = config.get()) {
     // 음성 오버레이는 쓰지 않음 (디스코드 기본 오버레이 사용)
     const hideForDiscord = discordFront && cfg.appearance.hideOnDiscord;
     const noGif = (name === 'gif' && !o.file && !editing)   // GIF 를 아직 안 골랐으면 숨김 (배치 중엔 자리 표시)
-      || (name === 'mirror' && mirrorKey === '[]' && !editing);   // 비출 창이 없으면 숨김
+      || (name === 'mirror' && !mirrorShown(cfg) && !editing);   // 비출 창(또는 닫기 버튼 놓을 팝업)이 없으면 숨김
     if (!o.enabled || userHidden || hideForDiscord || noGif || name === 'voice') { win.hide(); continue; }
     const d = resolveDisplay(o.monitor, cfg);
     const tall = d.bounds.height > d.bounds.width;
@@ -121,12 +123,14 @@ function popupsForDiscord(front) {
   const on = o.enabled && (o.show || 'arrange') === 'arrange' && o.minimizeOnDiscord !== false;
   if (front && on && lastPicked.length && !popupsDown) {
     popupsDown = true;
+    layoutAll();   // 닫기 버튼도 같이 숨김
     for (const w of lastPicked) {
       const n = Number(String(w.id).split(':')[1]);
       if (Number.isFinite(n)) minimizeWindow(n);
     }
   } else if (!front && popupsDown) {
     popupsDown = false;
+    layoutAll();
     arrangeWindows(lastPicked, cfg, true);   // 최소화된 창은 포커스 안 뺏고 되살려서 칸에 다시 맞춤
   }
 }
@@ -156,6 +160,7 @@ async function syncMirror(cfg = config.get()) {
   lastPicked = picked;
   const arrange = (o.show || 'arrange') === 'arrange';
   if (arrange) arrangeWindows(picked, cfg);
+  else { unstyle(); if (closers.length) setClosers([]); }
   // 칸에 맞춰 배치하는 방식이면 비추는 화면은 안 씀 (빈 목록)
   const key = arrange ? '[]' : JSON.stringify(picked);
   if (key === mirrorKey) return;
@@ -169,34 +174,65 @@ async function syncMirror(cfg = config.get()) {
 // 창 목록이나 칸 위치가 바뀔 때만 다시 맞춤 → 사용자가 잠깐 옮겨도 계속 끌어당기지는 않음
 let arrangeKey = '';
 let lastPicked = [];
+const hwndOf = (w) => Number(String(w.id).split(':')[1]);
+let closers = [];          // 칸에 놓은 팝업마다 닫기 버튼 위치 (mirror 창 기준)
+const styled = new Set();  // 위 줄을 자르거나 투명하게 만든 팝업 (되돌릴 때 씀)
+function setClosers(list) {
+  const was = closers.length > 0;
+  closers = list;
+  post(wins.mirror, 'mirror-closers', list);
+  if (was !== (list.length > 0)) layoutAll();
+}
+// 칸 배치를 그만두거나 목록에서 빠진 팝업은 원래 모습으로
+function unstyle(keepIds = []) {
+  for (const id of [...styled]) {
+    if (keepIds.includes(id)) continue;
+    const n = hwndOf({ id });
+    if (Number.isFinite(n)) { clipTop(n, 0); setOpacity(n, 1); }
+    styled.delete(id);
+  }
+}
+
 function arrangeWindows(list, cfg = config.get(), force = false) {
   const o = cfg.overlays.mirror;
   const d = resolveDisplay(o.monitor, cfg);
   const tall = d.bounds.height > d.bounds.width;
   const r = tall ? (o.rectTall || config.DEFAULTS.overlays.mirror.rectTall) : o.rect;
   const area = { x: d.bounds.x + r.x * d.bounds.width, y: d.bounds.y + r.y * d.bounds.height, width: r.w * d.bounds.width, height: r.h * d.bounds.height };
-  const key = JSON.stringify([list.map((w) => w.id), area]);
-  if (!list.length || (key === arrangeKey && !force)) { arrangeKey = list.length ? key : ''; return; }
+  const T = o.titleBar ?? 22;          // 팝업 위쪽 버튼 줄 높이 (DIP). 칸 위로 밀어 올리고 잘라서 안 보이게
+  const op = o.opacity ?? 1;
+  const key = JSON.stringify([list.map((w) => w.id), area, T, op]);
+  unstyle(list.map((w) => w.id));
+  if (!list.length) { arrangeKey = ''; setClosers([]); return; }
+  if (key === arrangeKey && !force) return;
   arrangeKey = key;
   const cells = gridCells(list.length, area, 6);
   list.forEach((w, i) => {
-    const n = Number(String(w.id).split(':')[1]);
+    const n = hwndOf(w);
     if (!Number.isFinite(n)) return;
-    const px = screen.dipToScreenRect(null, cells[i]);   // 디스플레이 배율 → 실제 화면 픽셀
+    const c = cells[i];
+    const dip = { x: c.x, y: c.y - T, width: c.width, height: c.height + T };
+    const px = screen.dipToScreenRect(null, dip);   // 디스플레이 배율 → 실제 화면 픽셀
     placeWindow(n, px, true);
+    clipTop(n, T ? Math.round(T * px.height / dip.height) : 0);
+    setOpacity(n, op);
+    styled.add(w.id);
   });
+  const ox = Math.round(area.x), oy = Math.round(area.y);
+  setClosers(list.map((w, i) => ({ id: w.id, x: cells[i].x - ox, y: cells[i].y - oy, width: cells[i].width, height: cells[i].height })));
+  if (wins.mirror && !wins.mirror.isDestroyed()) wins.mirror.moveTop();   // 닫기 버튼이 팝업 위에 오게
+  chatOnTop();
 }
 
-// 16:9 방송이 가장 크게 들어가는 칸 나누기. 창은 칸을 꽉 채우지 않고 영상 비율(+제목 줄)에 딱 맞춰서
+// 16:9 방송이 가장 크게 들어가는 칸 나누기. 창은 칸을 꽉 채우지 않고 영상 비율에 딱 맞춰서
 // 검은 여백이 안 생기게 함. 묶음은 아래·가운데 정렬 (남는 곳은 투명하게 비워 둠)
-const POPUP_TITLE = 32;   // 디스코드 팝업 위쪽 제목 줄 높이 (DIP)
 function gridCells(n, area, gap) {
   const fit = (cols) => {
     const rows = Math.ceil(n / cols);
     const cw = (area.width - gap * (cols - 1)) / cols;
     const ch = (area.height - gap * (rows - 1)) / rows;
-    const w = Math.max(0, Math.min(cw, (ch - POPUP_TITLE) * 16 / 9));
-    return { cols, rows, w, h: w * 9 / 16 + POPUP_TITLE };
+    const w = Math.max(0, Math.min(cw, ch * 16 / 9));
+    return { cols, rows, w, h: w * 9 / 16 };
   };
   let best = fit(1);
   for (let cols = 2; cols <= n; cols++) {
@@ -565,6 +601,14 @@ app.whenReady().then(() => {
   });
 
   setInterval(() => syncMirror(), 3000);
+  // 팝업을 누르면 팝업이 맨 위로 올라와서 닫기 버튼을 덮음 → 1초마다 버튼 창을 다시 위로
+  setInterval(() => {
+    const m = wins.mirror;
+    if (!closers.length || popupsDown || !m || m.isDestroyed() || !m.isVisible()) return;
+    if (foregroundIsFullscreen(ownHandles())) return;
+    m.moveTop();
+    chatOnTop();
+  }, 1000);
 
   trayApi = createTray({
     getUpdate: () => updater?.get(),
@@ -613,6 +657,13 @@ app.whenReady().then(() => {
     }
     win.setIgnoreMouseEvents(!on, { forward: true });
   });
+  // 방송 팝업 닫기 버튼
+  ipcMain.on('close-popup', (_e, id) => {
+    const w = lastPicked.find((x) => x.id === id);
+    if (!w || !Number.isFinite(hwndOf(w))) return;
+    closeWindow(hwndOf(w));
+    setTimeout(() => syncMirror().catch(() => {}), 600);
+  });
   // 채팅 말풍선 위에 마우스가 있는 동안만 휠을 받음 (포커스는 안 가져감 → 게임·작업 표시줄 그대로)
   ipcMain.on('set-hover', (e, on) => {
     const win = BrowserWindow.fromWebContents(e.sender);
@@ -633,6 +684,7 @@ app.on('before-quit', () => { quitting = true; });
 process.on('exit', () => { try { restoreTaskbars(); } catch {} });   // 숨긴 작업 표시줄은 무슨 일이 있어도 되돌림
 
 app.on('will-quit', () => {
+  unstyle();   // 팝업 투명도·잘라낸 위 줄 되돌리기
   restoreTaskbars();
   globalShortcut.unregisterAll();
   feed && feed.stop();

@@ -210,6 +210,8 @@ function fillMain() {
     () => o.mirror.mode || 'discord', (v) => { o.mirror.mode = v; paintMirror(); });
   bindSeg('mirror-autoclose', [{ label: '켜기', value: true }, { label: '끄기', value: false }], () => o.mirror.autoClose !== false, (v) => { o.mirror.autoClose = v; });
   bindSeg('mirror-mindc', [{ label: '켜기', value: true }, { label: '끄기', value: false }], () => o.mirror.minimizeOnDiscord !== false, (v) => { o.mirror.minimizeOnDiscord = v; });
+  bindSeg('mirror-opacity', [1, 0.85, 0.7, 0.5].map((v) => ({ label: `${Math.round(v * 100)}%`, value: v })), () => o.mirror.opacity ?? 1, (v) => { o.mirror.opacity = v; });
+  bindSeg('mirror-title', [{ label: '안 가림', value: 0 }, ...[22, 28, 34].map((v) => ({ label: `${v}px`, value: v }))], () => o.mirror.titleBar ?? 22, (v) => { o.mirror.titleBar = v; });
   $('mirror-refresh').onclick = () => paintMirror(true);
   paintMirror();
   // 내 GIF

@@ -317,3 +317,15 @@ body.editing .gif-empty:not([hidden]) { display: block; }
 body.editing .mirror .tile-name { opacity: 1; }
 .mirror-empty { position: fixed; inset: 0; display: none; place-items: center; }
 body.editing .mirror-empty:not([hidden]) { display: grid; }
+
+/* 방송 팝업 닫기 버튼 (팝업을 칸에 배치할 때) */
+.closers { position: absolute; inset: 0; pointer-events: none; }
+body.arranged .mirror, body.arranged .mirror-empty { display: none !important; }
+.popx {
+  position: absolute; width: 22px; height: 22px; padding: 0; pointer-events: auto;
+  display: grid; place-items: center; border-radius: 50%;
+  font: 700 11px/1 inherit; color: #fff; cursor: pointer;
+  background: rgba(10, 11, 14, 0.55); border: 1px solid rgba(255, 255, 255, 0.22);
+  opacity: 0.75; transition: opacity 0.15s, background 0.15s, transform 0.15s;
+}
+.popx:hover { opacity: 1; background: var(--accent); color: var(--accent-ink); transform: scale(1.1); }

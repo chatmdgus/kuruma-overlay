@@ -14,6 +14,7 @@ function load() {
     koffi.struct('MONITORINFO', { cbSize: 'uint32_t', rcMonitor: RECT, rcWork: RECT, dwFlags: 'uint32_t' });
     const user32 = koffi.load('user32.dll');
     const kernel32 = koffi.load('kernel32.dll');
+    const gdi32 = koffi.load('gdi32.dll');
     api = {
       GetForegroundWindow: user32.func('void * __stdcall GetForegroundWindow()'),
       GetWindowThreadProcessId: user32.func('uint32_t __stdcall GetWindowThreadProcessId(void *hWnd, _Out_ uint32_t *lpdwProcessId)'),
@@ -31,6 +32,12 @@ function load() {
       SetWindowPosN: user32.func('bool __stdcall SetWindowPos(intptr_t hWnd, intptr_t hWndInsertAfter, int X, int Y, int cx, int cy, uint32_t uFlags)'),
       IsIconicN: user32.func('bool __stdcall IsIconic(intptr_t hWnd)'),
       ShowWindowN: user32.func('bool __stdcall ShowWindow(intptr_t hWnd, int nCmdShow)'),
+      GetWindowLongPtrN: user32.func('intptr_t __stdcall GetWindowLongPtrW(intptr_t hWnd, int nIndex)'),
+      SetWindowLongPtrN: user32.func('intptr_t __stdcall SetWindowLongPtrW(intptr_t hWnd, int nIndex, intptr_t dwNewLong)'),
+      SetLayeredWindowAttributesN: user32.func('bool __stdcall SetLayeredWindowAttributes(intptr_t hwnd, uint32_t crKey, uint8_t bAlpha, uint32_t dwFlags)'),
+      SetWindowRgnN: user32.func('int __stdcall SetWindowRgn(intptr_t hWnd, void *hRgn, bool bRedraw)'),
+      CreateRectRgn: gdi32.func('void * __stdcall CreateRectRgn(int x1, int y1, int x2, int y2)'),
+      DeleteObject: gdi32.func('bool __stdcall DeleteObject(void *ho)'),
       PostMessageN: user32.func('bool __stdcall PostMessageW(intptr_t hWnd, uint32_t Msg, uintptr_t wParam, intptr_t lParam)'),
       ShowWindow: user32.func('bool __stdcall ShowWindow(void *hWnd, int nCmdShow)'),
       IsWindowVisible: user32.func('bool __stdcall IsWindowVisible(void *hWnd)'),
@@ -192,6 +199,38 @@ function placeWindow(hwndNumber, { x, y, width, height }, topmost = true) {
   } catch { return false; }
 }
 
+// 다른 프로그램 창 투명도 (1 = 원래대로). 우리가 투명하게 만든 창만 되돌림
+const layered = new Set();
+function setOpacity(hwndNumber, alpha) {
+  const a = load();
+  if (!a) return false;
+  try {
+    const GWL_EXSTYLE = -20, WS_EX_LAYERED = 0x80000;
+    const ex = Number(a.GetWindowLongPtrN(hwndNumber, GWL_EXSTYLE));
+    if (alpha >= 0.999) {
+      if (layered.has(hwndNumber)) { a.SetWindowLongPtrN(hwndNumber, GWL_EXSTYLE, ex & ~WS_EX_LAYERED); layered.delete(hwndNumber); }
+      return true;
+    }
+    if (!(ex & WS_EX_LAYERED)) { a.SetWindowLongPtrN(hwndNumber, GWL_EXSTYLE, ex | WS_EX_LAYERED); layered.add(hwndNumber); }
+    return a.SetLayeredWindowAttributesN(hwndNumber, 0, Math.round(Math.max(0.1, alpha) * 255), 2);   // LWA_ALPHA
+  } catch { return false; }
+}
+
+// 다른 프로그램 창의 위쪽 top 픽셀을 잘라서 안 보이게 (0 = 원래대로)
+function clipTop(hwndNumber, top) {
+  const a = load();
+  if (!a) return false;
+  try {
+    if (!top) return a.SetWindowRgnN(hwndNumber, null, true) !== 0;
+    const r = {};
+    if (!a.RectOfN(hwndNumber, r)) return false;
+    const rgn = a.CreateRectRgn(0, top, r.right - r.left, r.bottom - r.top);
+    if (!rgn) return false;
+    if (!a.SetWindowRgnN(hwndNumber, rgn, true)) { a.DeleteObject(rgn); return false; }   // 성공하면 창이 영역을 가져감
+    return true;
+  } catch { return false; }
+}
+
 // 다른 프로그램 창을 포커스 안 뺏고 최소화
 function minimizeWindow(hwndNumber) {
   const a = load();
@@ -206,4 +245,4 @@ function closeWindow(hwndNumber) {
   try { return a.PostMessageN(hwndNumber, 0x0010, 0, 0); } catch { return false; }   // WM_CLOSE
 }
 
-module.exports = { minimizeWindow, closeWindow, hideTaskbarOver, restoreTaskbars, placeWindow, watchForeground, foregroundExe, windowInfo, foregroundWindow, restoreForeground, foregroundIsFullscreen, available: () => !!load() };
+module.exports = { setOpacity, clipTop, minimizeWindow, closeWindow, hideTaskbarOver, restoreTaskbars, placeWindow, watchForeground, foregroundExe, windowInfo, foregroundWindow, restoreForeground, foregroundIsFullscreen, available: () => !!load() };

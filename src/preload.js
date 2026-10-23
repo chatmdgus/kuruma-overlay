@@ -1,6 +1,6 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
-const CHANNELS = ['settings', 'message', 'message-delete', 'media', 'voice', 'connection', 'input-mode', 'edit-mode', 'reset', 'target', 'channels', 'mirror-sources'];
+const CHANNELS = ['settings', 'message', 'message-delete', 'media', 'voice', 'connection', 'input-mode', 'edit-mode', 'reset', 'target', 'channels', 'mirror-sources', 'mirror-closers'];
 
 contextBridge.exposeInMainWorld('overlay', {
   on(channel, cb) {
@@ -14,6 +14,7 @@ contextBridge.exposeInMainWorld('overlay', {
   endInput() { ipcRenderer.send('end-input'); },
   setTarget(id) { ipcRenderer.send('set-target', id || null); },
   fetchLottie(url) { return ipcRenderer.invoke('fetch-lottie', url); },
+  closePopup(id) { ipcRenderer.send('close-popup', String(id)); },
   openLink(url) { ipcRenderer.send('open-link', url); },
   searchMembers(q) { return ipcRenderer.invoke('search-members', q); },
 });
