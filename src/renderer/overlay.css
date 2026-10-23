@@ -62,7 +62,7 @@ html, body {
 .list > .msg { flex: none; }
 .list > .msg.old { display: none; }
 /* 입력 중: 지난 기록을 펼쳐 볼 때는 바탕을 조금 진하게 */
-.chat.typing .list > .msg { background: rgba(var(--plate), calc(var(--bg) + 0.25)); }
+.chat.typing .list > .msg, .chat.browsing .list > .msg { background: rgba(var(--plate), calc(var(--bg) + 0.25)); }
 .latest {
   position: absolute; right: 14px; bottom: 3.6em; z-index: 2;
   padding: 0.35em 0.9em; border-radius: 999px; border: 1px solid var(--edge);

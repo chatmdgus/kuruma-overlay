@@ -147,7 +147,7 @@ function arrangeWindows(list, cfg = config.get(), force = false) {
 }
 
 // 16:9 방송이 가장 크게 들어가는 칸 나누기. 창은 칸을 꽉 채우지 않고 영상 비율(+제목 줄)에 딱 맞춰서
-// 검은 여백이 안 생기게 함. 묶음은 위·가운데 정렬 (남는 곳은 투명하게 비워 둠)
+// 검은 여백이 안 생기게 함. 묶음은 아래·가운데 정렬 (남는 곳은 투명하게 비워 둠)
 const POPUP_TITLE = 32;   // 디스코드 팝업 위쪽 제목 줄 높이 (DIP)
 function gridCells(n, area, gap) {
   const fit = (cols) => {
@@ -163,7 +163,7 @@ function gridCells(n, area, gap) {
     if (f.w > best.w * 1.01) best = f;
   }
   const { cols, rows, w, h } = best;
-  const top = area.y;   // 위에 붙이고 남는 곳은 아래로 몰아서 비워 둠
+  const top = area.y + area.height - (rows * h + gap * (rows - 1));   // 아래에 붙이고 남는 곳은 위로 몰아서 비워 둠
   return Array.from({ length: n }, (_, i) => {
     const row = Math.floor(i / cols);
     const inRow = row === rows - 1 ? n - row * cols : cols;   // 마지막 줄이 덜 차면 그 줄도 가운데로
@@ -568,6 +568,12 @@ app.whenReady().then(() => {
       // 입력창·링크 위에 마우스가 올라가면 클릭해서 포커스를 받을 수 있게. 그 전에 게임 창을 기억
       if (on) { prevForeground = foregroundWindow(); win.setFocusable(true); } else win.setFocusable(false);
     }
+    win.setIgnoreMouseEvents(!on, { forward: true });
+  });
+  // 채팅 말풍선 위에 마우스가 있는 동안만 휠을 받음 (포커스는 안 가져감 → 게임·작업 표시줄 그대로)
+  ipcMain.on('set-hover', (e, on) => {
+    const win = BrowserWindow.fromWebContents(e.sender);
+    if (!win || win !== wins.chat || win.isFocused()) return;
     win.setIgnoreMouseEvents(!on, { forward: true });
   });
   // 채팅 글 속 링크: http/https 만 브라우저로

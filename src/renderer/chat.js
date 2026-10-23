@@ -1,6 +1,7 @@
 // 채팅 오버레이
 // - 평소: 최근 maxLines 줄만 잠깐 보였다가 사라짐 (기록은 남겨 둠)
 // - 입력 중: 지난 기록 전체를 휠로 스크롤해서 봄, "최신으로" 버튼, 링크 클릭, @멘션
+// - 입력 안 해도 말풍선 위에서 휠을 올리면 지난 기록을 펼쳐 봄 (마우스가 나가면 평소 보기로)
 const chat = document.getElementById('chat');
 const list = document.getElementById('list');
 const inputBox = document.getElementById('input');
@@ -10,6 +11,8 @@ const latestBtn = document.getElementById('latest');
 const HISTORY_MAX = 300;   // 남겨 둘 기록 줄 수
 let settings = { fadeSec: 10, maxLines: 8, fontSize: 15, bgOpacity: 0.45 };
 let typing = false;
+let browsing = false;      // 입력 없이 휠로 지난 기록 보는 중
+const expanded = () => typing || browsing;
 let me = null;             // 내 디스코드 이름 (멘션 강조용)
 
 function applySettings() {
@@ -23,7 +26,7 @@ const fresh = (row) => !settings.fadeSec || Date.now() - row._born < settings.fa
 
 // 평소: 사라지지 않은 최근 maxLines 줄만 보임
 function glance() {
-  if (typing) return;
+  if (expanded()) return;
   const rows = [...list.children];
   rows.forEach((row, i) => {
     const show = i >= rows.length - settings.maxLines && fresh(row);
@@ -36,12 +39,12 @@ function glance() {
 
 function scheduleFade(row) {
   clearTimeout(row._timer);
-  if (!settings.fadeSec || typing) return;
+  if (!settings.fadeSec || expanded()) return;
   const left = settings.fadeSec * 1000 - (Date.now() - row._born);
   row._timer = setTimeout(() => {
-    if (typing) return;
+    if (expanded()) return;
     row.classList.add('gone');
-    row._timer = setTimeout(() => { if (!typing) row.classList.add('old'); }, 500);
+    row._timer = setTimeout(() => { if (!expanded()) row.classList.add('old'); }, 500);
   }, Math.max(0, left));
 }
 
@@ -50,9 +53,61 @@ function toBottom(smooth) {
   list.scrollTo({ top: list.scrollHeight, behavior: smooth ? 'smooth' : 'auto' });
   latestBtn.classList.remove('on', 'new');
 }
-list.addEventListener('scroll', () => { if (nearBottom()) latestBtn.classList.remove('on', 'new'); else if (typing) latestBtn.classList.add('on'); });
+list.addEventListener('scroll', () => { if (nearBottom()) latestBtn.classList.remove('on', 'new'); else if (expanded()) latestBtn.classList.add('on'); });
 latestBtn.addEventListener('mousedown', (e) => e.preventDefault());
-latestBtn.addEventListener('click', () => { toBottom(true); text.focus(); });
+latestBtn.addEventListener('click', () => { toBottom(true); if (typing) text.focus(); });
+
+// ---------- 입력 없이 휠로 지난 기록 보기 ----------
+let hover = false;
+let browseEnd = null;
+function setHover(on) {
+  if (hover === on) return;
+  hover = on;
+  window.overlay.setHover(on);
+}
+function expandRows() {
+  for (const row of list.children) { clearTimeout(row._timer); row.classList.remove('gone', 'old'); }
+}
+function startBrowse() {
+  if (expanded()) return;
+  browsing = true;
+  chat.classList.add('browsing');
+  expandRows();
+  toBottom();
+}
+function stopBrowse() {
+  clearTimeout(browseEnd);
+  if (!browsing) return;
+  browsing = false;
+  chat.classList.remove('browsing');
+  latestBtn.classList.remove('on', 'new');
+  glance();
+}
+// 평소엔 말풍선 위, 기록을 펼친 동안엔 기록 칸 전체 위에서만 마우스를 받음. 그 밖은 게임으로 통과
+function overChat(e) {
+  if (e.target.closest?.('.latest.on, .msg:not(.old)')) return true;
+  if (!browsing) return false;
+  const r = list.getBoundingClientRect();
+  return e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom;
+}
+document.addEventListener('mousemove', (e) => {
+  if (typing || e.target.closest?.('#input')) return;   // 입력창은 따로 처리 (clickable)
+  const over = overChat(e);
+  setHover(over);
+  clearTimeout(browseEnd);
+  if (!over && browsing) browseEnd = setTimeout(stopBrowse, 700);
+});
+document.addEventListener('mouseleave', () => {
+  if (typing) return;
+  setHover(false);
+  if (browsing) { clearTimeout(browseEnd); browseEnd = setTimeout(stopBrowse, 700); }
+});
+list.addEventListener('wheel', (e) => {
+  if (typing || browsing || e.deltaY >= 0) return;
+  e.preventDefault();
+  startBrowse();
+  list.scrollBy({ top: e.deltaY });
+}, { passive: false });
 
 // ---------- 메시지 ----------
 // 스티커: 말풍선 안에 그림으로. 디스코드 기본 스티커(Lottie)는 애니메이션으로 그림
@@ -97,6 +152,7 @@ function richText(body) {
     a.title = m[0];
     a.addEventListener('click', (e) => { e.preventDefault(); window.overlay.openLink(m[0]); if (!typing) window.overlay.endInput(); });
     ui.clickable(a);
+    a.addEventListener('mouseleave', () => { hover = false; });   // 클릭 받기가 꺼졌으니 다음 움직임에 다시 알림
     frag.append(a);
     last = m.index + m[0].length;
   }
@@ -118,7 +174,7 @@ function mentions(str) {
 }
 
 function addMessage({ id, author = {}, text: body, mediaOnly, channel, stickers = [] }) {
-  const stick = typing && nearBottom();
+  const stick = expanded() && nearBottom();
   const row = document.createElement('div');
   row.className = 'msg plate fade';
   row.dataset.id = id;
@@ -146,7 +202,7 @@ function addMessage({ id, author = {}, text: body, mediaOnly, channel, stickers 
   list.appendChild(row);
   while (list.children.length > HISTORY_MAX) list.firstChild.remove();
 
-  if (typing) {
+  if (expanded()) {
     if (stick) toBottom(true);
     else latestBtn.classList.add('on', 'new');
   } else glance();
@@ -264,6 +320,7 @@ window.overlay.on('input-mode', ({ on, focus }) => {
 // 커서가 들어오면 지난 기록을 전부 펼쳐서 스크롤 가능, 나가면 평소 보기로
 function setTyping(on) {
   if (typing === on) return;
+  if (on) { browsing = false; chat.classList.remove('browsing'); clearTimeout(browseEnd); hover = false; }
   typing = on;
   inputBox.classList.toggle('typing', on);
   chat.classList.toggle('typing', on);
@@ -319,6 +376,7 @@ text.addEventListener('keydown', (e) => {
 
 // 클릭 통과 창이라 입력창 위에 마우스가 있을 때만 클릭을 받음 (입력 중에는 창 전체)
 ui.clickable(inputBox);
+inputBox.addEventListener('mouseleave', () => { hover = false; });
 
 ui.bindStatus(document.getElementById('status'));
 applySettings();

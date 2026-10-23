@@ -9,6 +9,7 @@ contextBridge.exposeInMainWorld('overlay', {
   },
   send(content) { ipcRenderer.send('send', content); },
   setClickable(on) { ipcRenderer.send('set-clickable', !!on); },
+  setHover(on) { ipcRenderer.send('set-hover', !!on); },
   openSettings() { ipcRenderer.send('open-settings'); },
   endInput() { ipcRenderer.send('end-input'); },
   setTarget(id) { ipcRenderer.send('set-target', id || null); },
