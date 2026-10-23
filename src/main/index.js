@@ -44,6 +44,7 @@ const post = (w, ...args) => { if (w && !w.isDestroyed()) w.webContents.send(...
 const alive = () => Object.values(wins).filter((w) => !w.isDestroyed());
 
 if (!app.requestSingleInstanceLock()) app.quit();
+if (process.platform === 'win32') app.setAppUserModelId('dev.kuruma.overlay');   // 설치 때 만든 바로가기와 같은 ID (작업 표시줄·알림 아이콘)
 
 function resolveDisplay(role, cfg = config.get()) {
   const displays = screen.getAllDisplays();
