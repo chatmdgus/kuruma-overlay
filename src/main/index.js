@@ -12,6 +12,7 @@ const { createTray } = require('./tray');
 const { startTunnel } = require('./tunnel');
 const { login, describeLoginError } = require('./login');
 const { watchForeground } = require('./foreground');
+const { setupUpdater } = require('./updater');
 
 const MOCK = process.argv.includes('--mock');
 const wins = {};
@@ -28,6 +29,9 @@ let userHidden = false;
 let registeredHotkey = null;
 let quitting = false;
 let discordFront = false;          // 디스코드 창이 맨 앞에 있는지
+let updater = null;
+let trayApi = null;
+let lastUpdateKey = '';
 // 종료 중에는 창이 먼저 없어질 수 있어서 확인하고 보냄
 const post = (w, ...args) => { if (w && !w.isDestroyed()) w.webContents.send(...args); };
 const alive = () => Object.values(wins).filter((w) => !w.isDestroyed());
@@ -56,6 +60,13 @@ function layoutAll(cfg = config.get()) {
     placeOverlay(win, d, tall ? (o.rectTall || config.DEFAULTS.overlays[name].rectTall) : o.rect);
     win.showInactive();
   }
+  chatOnTop();
+}
+
+// 채팅 창이 사진 창과 겹치면 채팅이 위에 오게
+function chatOnTop() {
+  const c = wins.chat;
+  if (c && !c.isDestroyed() && c.isVisible()) c.moveTop();
 }
 
 function sendSettings(cfg = config.get()) {
@@ -202,6 +213,8 @@ function emit(type, payload) {
 
 const settingsDeps = {
   isQuitting: () => quitting,
+  getUpdate: () => updater?.get() || null,
+  update: (action) => { if (action === 'install') updater?.install(); else updater?.check(); },
   config,
   resolveDisplay: (role) => resolveDisplay(role),
   getConnection: () => connection,
@@ -269,9 +282,18 @@ app.whenReady().then(() => {
   screen.on('display-metrics-changed', relayout);
 
   // 게임이 항상 위를 가로채는 경우 대비
-  setInterval(() => alive().forEach((w) => w.setAlwaysOnTop(true, 'screen-saver')), 5000);
+  setInterval(() => { alive().forEach((w) => w.setAlwaysOnTop(true, 'screen-saver')); chatOnTop(); }, 5000);
 
-  createTray({
+  updater = setupUpdater((u) => {
+    notifySettings('update', u);
+    // 트레이 메뉴는 상태가 바뀌거나 10%마다만 다시 만듦 (열려 있는 메뉴가 닫히지 않게)
+    const key = `${u.state}:${u.version || ''}:${Math.floor((u.percent || 0) / 10)}`;
+    if (key !== lastUpdateKey) { lastUpdateKey = key; trayApi?.refresh(); }
+  });
+
+  trayApi = createTray({
+    getUpdate: () => updater?.get(),
+    onUpdate: (action) => settingsDeps.update(action),
     onToggle: (visible) => { userHidden = !visible; if (userHidden) setInputMode(false); layoutAll(); },
     onSettings: () => openSettings(settingsDeps),
     onQuit: () => app.quit(),

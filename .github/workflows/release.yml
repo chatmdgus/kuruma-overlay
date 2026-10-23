@@ -45,5 +45,11 @@ jobs:
           VERSION=$(node -p "require('./package.json').version")
           NOTES="Kuruma Overlay v${VERSION} ($(date -u +%Y-%m-%d))"
           gh release view "$TAG" -R "$REPO" >/dev/null 2>&1 || gh release create "$TAG" -R "$REPO" --title "Kuruma Overlay" --notes "$NOTES"
-          gh release upload "$TAG" "dist/KurumaOverlay-Setup.exe" -R "$REPO" --clobber
+          if [ ! -f dist/latest.yml ]; then
+            echo "::error::dist/latest.yml 이 없음 (자동 업데이트용). package.json build.publish 확인"
+            exit 1
+          fi
+          # 앱이 latest.yml 을 보고 업데이트하므로 설치 파일을 먼저, latest.yml 은 마지막에 올림
+          gh release upload "$TAG" dist/KurumaOverlay-Setup.exe dist/KurumaOverlay-Setup.exe.blockmap -R "$REPO" --clobber
+          gh release upload "$TAG" dist/latest.yml -R "$REPO" --clobber
           gh release edit "$TAG" -R "$REPO" --notes "$NOTES"

@@ -29,6 +29,7 @@ section:last-child { border-bottom: 0; }
 header { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
 h2 { font-size: 16px; font-weight: 700; margin: 0; letter-spacing: -0.01em; }
 header .sm { margin-left: auto; }
+.presets { margin-left: auto; display: flex; gap: 6px; }
 .note { color: var(--muted); font-size: 12.5px; margin: 0 0 12px; }
 
 .rows { display: flex; flex-direction: column; }
@@ -66,7 +67,7 @@ input[type=text]:focus, input[type=password]:focus { border-color: var(--accent)
 .seg button[aria-checked=true]:hover { color: var(--accent-ink); }
 
 /* 배치 무대 */
-.stage { position: relative; height: 280px; background: var(--panel); border-radius: 12px; overflow: hidden; }
+.stage { position: relative; height: 340px; background: var(--panel); border-radius: 12px; overflow: hidden; }
 .mon { position: absolute; border: 1.5px solid #3a404c; border-radius: 6px; background: #0f1115; }
 .mon.used { border-color: #6b7384; }
 .mon .tag { position: absolute; left: 8px; top: 5px; font-size: 11.5px; font-weight: 700; color: var(--ink); pointer-events: none; white-space: nowrap; }
@@ -79,7 +80,9 @@ input[type=text]:focus, input[type=password]:focus { border-color: var(--accent)
 .box.chat { border-color: var(--chat); background: rgba(167, 180, 255, 0.16); color: var(--chat); }
 .box.media { border-color: var(--media); background: rgba(123, 224, 168, 0.16); color: var(--media); }
 .box.voice { border-color: var(--voice); background: rgba(255, 184, 107, 0.16); color: var(--voice); }
-.box .handle { position: absolute; right: -1px; bottom: -1px; width: 12px; height: 12px; cursor: nwse-resize; background: currentColor; border-radius: 4px 0 5px 0; }
+.box.chat { z-index: 2; }
+.box.dragging { z-index: 3; }
+.box:hover { border-width: 2px; }
 
 /* 표시할 오버레이: 눌러서 켜고 끄는 칩 */
 .chips { display: flex; gap: 8px; margin-top: 12px; }

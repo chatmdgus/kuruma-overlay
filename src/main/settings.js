@@ -29,6 +29,7 @@ function setupSettings(deps) {
       connection: deps.getConnection(),
       tunnel: deps.getTunnel(),
       mock: deps.isMock(),
+      update: deps.getUpdate(),
     };
   });
 
@@ -46,6 +47,7 @@ function setupSettings(deps) {
   ipcMain.handle('settings:close', () => { win && win.close(); });
   ipcMain.handle('settings:login', (_e, partial) => deps.login(partial));
   ipcMain.handle('settings:logout', () => deps.logout());
+  ipcMain.handle('settings:update', (_e, action) => deps.update(action));
 
   ipcMain.handle('settings:pick-key', async () => {
     const r = await dialog.showOpenDialog(win, {

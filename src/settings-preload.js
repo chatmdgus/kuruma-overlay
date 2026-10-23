@@ -10,4 +10,6 @@ contextBridge.exposeInMainWorld('settingsApi', {
   pickKey: () => ipcRenderer.invoke('settings:pick-key'),
   login: (partial) => ipcRenderer.invoke('settings:login', partial),
   logout: () => ipcRenderer.invoke('settings:logout'),
+  update: (action) => ipcRenderer.invoke('settings:update', action),
+  onUpdate: (cb) => ipcRenderer.on('update', (_e, u) => cb(u)),
 });

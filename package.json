@@ -1,6 +1,6 @@
 {
   "name": "kuruma-overlay",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "private": true,
   "description": "디스코드 클라이언트 없이 채팅·음성 참여자를 화면 오버레이로 보는 앱",
   "main": "src/main/index.js",
@@ -10,6 +10,7 @@
     "dist": "electron-builder --win nsis"
   },
   "dependencies": {
+    "electron-updater": "^6.3.0",
     "koffi": "^2.9.0"
   },
   "devDependencies": {
@@ -26,6 +27,12 @@
     "directories": {
       "output": "dist"
     },
+    "publish": [
+      {
+        "provider": "generic",
+        "url": "https://github.com/chatmdgus/kuruma-downloads/releases/download/overlay-latest"
+      }
+    ],
     "win": {
       "target": "nsis",
       "signAndEditExecutable": false,

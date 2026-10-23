@@ -261,16 +261,16 @@ function render() {
     nodes.push(el);
   }
 
-  for (const name of Object.keys(NAMES)) {
+  // 채팅이 항상 위에 오게 사진·영상을 먼저 그림
+  for (const name of ['media', 'chat']) {
     const r = overlayStageRect(name);
     const el = document.createElement('div');
     el.className = `box ${name}` + (state.overlays[name].enabled ? '' : ' off');
     Object.assign(el.style, { left: `${r.left}px`, top: `${r.top}px`, width: `${r.width}px`, height: `${r.height}px` });
     el.textContent = NAMES[name];
-    const handle = document.createElement('div');
-    handle.className = 'handle';
-    el.append(handle);
-    el.addEventListener('pointerdown', (e) => startDrag(e, name, e.target === handle ? 'resize' : 'move'));
+    // 테두리 근처면 그 방향으로 크기 조절, 안쪽이면 이동
+    el.addEventListener('pointermove', (e) => { if (!el.classList.contains('dragging')) el.style.cursor = CURSOR[edgesAt(el, e)] || ''; });
+    el.addEventListener('pointerdown', (e) => { const edges = edgesAt(el, e); startDrag(e, name, edges ? 'resize' : 'move', edges); });
     nodes.push(el);
   }
 
@@ -278,7 +278,7 @@ function render() {
 }
 
 // 무대 좌표의 상자를 해당 모니터 기준 비율로 되돌림
-function commitRect(name, box, mode) {
+function commitRect(name, box, mode, edges = '') {
   const o = state.overlays[name];
   let role = o.monitor;
 
@@ -302,15 +302,24 @@ function commitRect(name, box, mode) {
   let y = (box.top - m.top) / m.height;
 
   if (mode === 'resize') {
-    w = Math.max(MIN, Math.min(w, 1 - x));
-    h = Math.max(MIN, Math.min(h, 1 - y));
+    // 변 단위로 계산: 움직인 변만 0~1 안으로 자르고 붙임, 반대쪽 변은 그대로
+    let x1 = (box.left - m.left) / m.width, y1 = (box.top - m.top) / m.height;
+    let x2 = x1 + box.width / m.width, y2 = y1 + box.height / m.height;
+    const snap = (v) => (v < SNAP ? 0 : v > 1 - SNAP ? 1 : v);
+    if (edges.includes('w')) x1 = Math.min(snap(Math.max(0, x1)), x2 - MIN);
+    if (edges.includes('e')) x2 = Math.max(snap(Math.min(1, x2)), x1 + MIN);
+    if (edges.includes('n')) y1 = Math.min(snap(Math.max(0, y1)), y2 - MIN);
+    if (edges.includes('s')) y2 = Math.max(snap(Math.min(1, y2)), y1 + MIN);
+    o.monitor = role;
+    o[rectKey(o)] = { x: round(x1), y: round(y1), w: round(x2 - x1), h: round(y2 - y1) };
+    return;
   }
   x = Math.min(Math.max(0, x), 1 - w);
   y = Math.min(Math.max(0, y), 1 - h);
   if (x < SNAP) x = 0;
   if (y < SNAP) y = 0;
-  if (1 - (x + w) < SNAP) { if (mode === 'move') x = 1 - w; else w = 1 - x; }
-  if (1 - (y + h) < SNAP) { if (mode === 'move') y = 1 - h; else h = 1 - y; }
+  if (1 - (x + w) < SNAP) x = 1 - w;
+  if (1 - (y + h) < SNAP) y = 1 - h;
 
   o.monitor = role;
   o[rectKey(o)] = { x: round(x), y: round(y), w: round(w), h: round(h) };
@@ -318,7 +327,16 @@ function commitRect(name, box, mode) {
 
 const round = (v) => Math.round(v * 1000) / 1000;
 
-function startDrag(e, name, mode) {
+const EDGE = 8;   // 테두리에서 이 픽셀 안쪽까지 크기 조절
+const CURSOR = { n: 'ns-resize', s: 'ns-resize', e: 'ew-resize', w: 'ew-resize', ne: 'nesw-resize', sw: 'nesw-resize', nw: 'nwse-resize', se: 'nwse-resize' };
+function edgesAt(el, e) {
+  const r = el.getBoundingClientRect();
+  const x = e.clientX - r.left, y = e.clientY - r.top;
+  const edge = Math.min(EDGE, r.width / 4, r.height / 4);
+  return (y < edge ? 'n' : y > r.height - edge ? 's' : '') + (x < edge ? 'w' : x > r.width - edge ? 'e' : '');
+}
+
+function startDrag(e, name, mode, edges = '') {
   e.preventDefault();
   const el = e.currentTarget;
   el.setPointerCapture(e.pointerId);
@@ -328,10 +346,17 @@ function startDrag(e, name, mode) {
   const onMove = (ev) => {
     const dx = ev.clientX - start.x;
     const dy = ev.clientY - start.y;
-    const box = mode === 'move'
-      ? { left: start.left + dx, top: start.top + dy, width: start.width, height: start.height }
-      : { left: start.left, top: start.top, width: start.width + dx, height: start.height + dy };
-    commitRect(name, box, mode);
+    let box;
+    if (mode === 'move') box = { left: start.left + dx, top: start.top + dy, width: start.width, height: start.height };
+    else {
+      let l = start.left, t = start.top, r = start.left + start.width, b = start.top + start.height;
+      if (edges.includes('w')) l += dx;
+      if (edges.includes('e')) r += dx;
+      if (edges.includes('n')) t += dy;
+      if (edges.includes('s')) b += dy;
+      box = { left: l, top: t, width: r - l, height: b - t };
+    }
+    commitRect(name, box, mode, edges);
     const r = overlayStageRect(name);
     Object.assign(el.style, { left: `${r.left}px`, top: `${r.top}px`, width: `${r.width}px`, height: `${r.height}px` });
     preview();
@@ -393,15 +418,83 @@ $('setup-done').onclick = async () => {
 $('setup-back').onclick = () => showView('main');
 $('open-setup').onclick = () => { $('setup-back').hidden = false; showView('setup'); };
 
-$('reset').onclick = () => {
+// ---------- 업데이트 ----------
+// 새 버전은 백그라운드로 받아두고, 다 받으면 "업데이트" 버튼이 켜짐 → 누르면 바로 설치 후 다시 켜짐
+function showUpdate(u) {
+  const b = $('update');
+  if (!u || u.state === 'dev') { b.hidden = true; return; }
+  b.hidden = false;
+  b.disabled = u.state === 'downloading' || u.state === 'checking';
+  b.className = u.state === 'ready' ? 'primary' : 'ghost';
+  b.textContent = u.state === 'ready' ? `업데이트 (v${u.version})`
+    : u.state === 'downloading' ? `새 버전 받는 중 ${u.percent || 0}%`
+    : u.state === 'checking' ? '확인 중…'
+    : u.state === 'latest' ? `최신 v${u.current}`
+    : u.state === 'error' ? '업데이트 확인 실패 · 다시'
+    : '업데이트 확인';
+  b.onclick = () => window.settingsApi.update(u.state === 'ready' ? 'install' : 'check');
+}
+
+// ---------- 배치 프리셋 ----------
+// 모니터를 세로·일반(16:9 근처)·와이드(21:9 이상)로 나누고, 크기는 화면 픽셀(배율 적용된 값) 기준으로 잡아서
+// 작은 모니터에선 비율이 커지고 큰 모니터에선 작아짐 (인치·해상도 차이를 같이 반영)
+const monitorKind = (b) => (b.height > b.width ? 'tall' : b.width / b.height >= 2 ? 'wide' : 'normal');
+const PRESETS = [
+  { id: 'side', label: '오른쪽 세로줄' },
+  { id: 'bottom', label: '아래쪽' },
+  { id: 'compact', label: '작게' },
+];
+function presetRects(id, b) {
+  const W = b.width, H = b.height, m = 16, gap = 12;
+  const kind = monitorKind(b);
+  const px = (v, max) => Math.min(v, max);
+  let chat, media;
+  if (id === 'side') {
+    if (kind === 'tall') {
+      const half = (W - m * 2 - gap) / 2, h = H * 0.45;
+      media = { x: m, y: H - m - h, w: half, h };
+      chat = { x: m + half + gap, y: H - m - h, w: half, h };
+    } else {
+      const cw = px(460, W * 0.3), mw = px(430, W * 0.28), top = H * 0.34;
+      chat = { x: W - m - cw, y: top, w: cw, h: H - top - m };
+      media = { x: chat.x - gap - mw, y: top, w: mw, h: H - top - m };
+    }
+  } else if (id === 'bottom') {
+    if (kind === 'tall') {
+      media = { x: m, y: m, w: W - m * 2, h: H * 0.32 };
+      chat = { x: m, y: H * 0.58, w: W - m * 2, h: H * 0.42 - m };
+    } else {
+      const h = px(380, H * 0.4), cw = px(kind === 'wide' ? 720 : 620, W * 0.42), mw = px(520, W * 0.3);
+      chat = { x: m, y: H - m - h, w: cw, h };
+      media = { x: W - m - mw, y: H - m - h, w: mw, h };
+    }
+  } else {
+    const cw = px(380, W * (kind === 'tall' ? 0.6 : 0.28)), ch = px(440, H * 0.42), mh = px(300, H * 0.3);
+    chat = { x: W - m - cw, y: m, w: cw, h: ch };
+    media = { x: W - m - cw, y: m + ch + gap, w: cw, h: mh };
+  }
+  const ratio = (r) => ({ x: round(r.x / W), y: round(r.y / H), w: round(r.w / W), h: round(r.h / H) });
+  return { chat: ratio(chat), media: ratio(media) };
+}
+function applyPreset(id) {
+  const d = displayById(roleId('sub'));
+  const rects = presetRects(id, d.bounds);
   for (const name of Object.keys(NAMES)) {
-    state.overlays[name].monitor = defaults.overlays[name].monitor;
-    state.overlays[name].rect = clone(defaults.overlays[name].rect);
-    state.overlays[name].rectTall = clone(defaults.overlays[name].rectTall);
+    const o = state.overlays[name];
+    o.monitor = 'sub';
+    o[rectKey(o)] = rects[name];
   }
   render();
   preview();
-};
+}
+$('presets').replaceChildren(...PRESETS.map((p) => {
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.className = 'ghost sm';
+  b.textContent = p.label;
+  b.onclick = () => applyPreset(p.id);
+  return b;
+}));
 
 $('save').onclick = async () => {
   await window.settingsApi.save(savable());
@@ -423,6 +516,8 @@ window.addEventListener('resize', () => state && render());
   showTunnel(res.tunnel);
   window.settingsApi.onConnection(showConnection);
   window.settingsApi.onTunnel(showTunnel);
+  showUpdate(res.update);
+  window.settingsApi.onUpdate(showUpdate);
 
   fillSetup();
   fillMain();

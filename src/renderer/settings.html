@@ -74,8 +74,8 @@
       </div>
 
       <section>
-        <header><h2>배치</h2><button id="reset" type="button" class="ghost sm">기본 배치로</button></header>
-        <p class="note">상자를 끌어서 옮기고, 오른쪽 아래 모서리로 크기를 조절함. 실제 화면에도 바로 보임.</p>
+        <header><h2>배치</h2><span class="presets" id="presets" aria-label="배치 프리셋"></span></header>
+        <p class="note">프리셋을 고르면 서브 모니터 크기·방향에 맞춰 놓임. 상자를 끌어서 옮기고, 테두리를 끌어서 크기를 조절함.</p>
         <div id="stage" class="stage"></div>
         <div class="chips" id="enabled" aria-label="표시할 오버레이"></div>
       </section>
@@ -108,6 +108,7 @@
     </main>
     <footer>
       <span class="msg" id="main-msg">채팅 입력은 Ctrl+Shift+D</span>
+      <button id="update" type="button" class="ghost" hidden></button>
       <button id="cancel" type="button" class="ghost">닫기</button>
       <button id="save" type="button" class="primary">저장</button>
     </footer>
