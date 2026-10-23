@@ -24,7 +24,7 @@ const DEFAULTS = {
     // 내 GIF: 고른 이미지를 화면에 계속 띄움 (파일은 설정 폴더 gif/ 에 복사해 둠)
     gif: { enabled: false, monitor: 'main', rect: { x: 0.84, y: 0.66, w: 0.14, h: 0.3 }, rectTall: { x: 0.6, y: 0.05, w: 0.36, h: 0.18 }, file: '', name: '', opacity: 1 },
     // 방송 화면: 내 PC에 띄운 디스코드 방송 팝업(또는 고른 창)을 비춰서 칸을 나눠 보여줌
-    mirror: { enabled: false, monitor: 'sub', rect: { x: 0.505, y: 0.03, w: 0.49, h: 0.3 }, rectTall: { x: 0.02, y: 0.03, w: 0.96, h: 0.3 }, mode: 'discord', titles: [], fps: 30, show: 'arrange', autoClose: true },   // show: arrange(팝업을 칸에 맞춰 옮김) / mirror(화면만 비춤)
+    mirror: { enabled: false, monitor: 'sub', rect: { x: 0.505, y: 0.03, w: 0.49, h: 0.3 }, rectTall: { x: 0.02, y: 0.03, w: 0.96, h: 0.3 }, mode: 'discord', titles: [], fps: 30, show: 'arrange', autoClose: true, minimizeOnDiscord: true },   // show: arrange(팝업을 칸에 맞춰 옮김) / mirror(화면만 비춤)
     voice: { enabled: false, monitor: 'main', rect: { x: 0.008, y: 0.015, w: 0.15, h: 0.42 }, rectTall: { x: 0.01, y: 0.01, w: 0.27, h: 0.24 }, scale: 1.25, gap: 6, showControls: true },
   },
   hotkeys: { input: 'CommandOrControl+Shift+Enter' },   // 입력창 켜기/끄기 (설정에서 바꿀 수 있음)

@@ -209,6 +209,7 @@ function fillMain() {
   bindSeg('mirror-mode', [{ label: '디스코드 팝업 자동', value: 'discord' }, { label: '직접 고르기', value: 'pick' }],
     () => o.mirror.mode || 'discord', (v) => { o.mirror.mode = v; paintMirror(); });
   bindSeg('mirror-autoclose', [{ label: '켜기', value: true }, { label: '끄기', value: false }], () => o.mirror.autoClose !== false, (v) => { o.mirror.autoClose = v; });
+  bindSeg('mirror-mindc', [{ label: '켜기', value: true }, { label: '끄기', value: false }], () => o.mirror.minimizeOnDiscord !== false, (v) => { o.mirror.minimizeOnDiscord = v; });
   $('mirror-refresh').onclick = () => paintMirror(true);
   paintMirror();
   // 내 GIF

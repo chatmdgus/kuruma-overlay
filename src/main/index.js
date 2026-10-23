@@ -12,7 +12,7 @@ const { setupSettings, openSettings, notifySettings } = require('./settings');
 const { createTray } = require('./tray');
 const { startTunnel } = require('./tunnel');
 const { login, describeLoginError } = require('./login');
-const { closeWindow, hideTaskbarOver, restoreTaskbars, placeWindow, watchForeground, windowInfo, foregroundWindow, restoreForeground, foregroundIsFullscreen } = require('./foreground');
+const { minimizeWindow, closeWindow, hideTaskbarOver, restoreTaskbars, placeWindow, watchForeground, windowInfo, foregroundWindow, restoreForeground, foregroundIsFullscreen } = require('./foreground');
 const { shell, desktopCapturer } = require('electron');
 const { setupUpdater } = require('./updater');
 
@@ -113,6 +113,24 @@ function onStreams(payload) {
   if (targets.length) setTimeout(() => syncMirror().catch(() => {}), 800);
 }
 
+// 디스코드 본창이 맨 앞에 오면 칸에 배치한 방송 팝업을 최소화, 벗어나면 다시 칸에 꺼내 놓음
+let popupsDown = false;
+function popupsForDiscord(front) {
+  const cfg = config.get();
+  const o = cfg.overlays.mirror;
+  const on = o.enabled && (o.show || 'arrange') === 'arrange' && o.minimizeOnDiscord !== false;
+  if (front && on && lastPicked.length && !popupsDown) {
+    popupsDown = true;
+    for (const w of lastPicked) {
+      const n = Number(String(w.id).split(':')[1]);
+      if (Number.isFinite(n)) minimizeWindow(n);
+    }
+  } else if (!front && popupsDown) {
+    popupsDown = false;
+    arrangeWindows(lastPicked, cfg, true);   // 최소화된 창은 포커스 안 뺏고 되살려서 칸에 다시 맞춤
+  }
+}
+
 // 창 목록은 맨 앞에 있는 순서로 오기 때문에 팝업을 누를 때마다 순서가 바뀜
 // → 처음 보인 순서대로 고정 (새 창은 뒤에 붙고, 닫힌 창은 빠짐)
 const seenOrder = new Map();
@@ -124,6 +142,7 @@ function stableOrder(list) {
   return [...list].sort((a, b) => seenOrder.get(a.id) - seenOrder.get(b.id));
 }
 async function syncMirror(cfg = config.get()) {
+  if (popupsDown) return;   // 디스코드 때문에 잠깐 내려 둔 동안은 목록을 그대로 둠 (최소화된 창은 목록에서 빠질 수 있음)
   const o = cfg.overlays.mirror;
   let picked = [];
   if (o.enabled && !MOCK) {
@@ -522,7 +541,8 @@ app.whenReady().then(() => {
     discordFront = front;
     if (front && config.get().appearance.hideOnDiscord) endTyping();
     layoutAll();
-  });
+    popupsForDiscord(front);
+  }, 400, (addr) => lastPicked.some((w) => String(addr) === String(w.id).split(':')[1]));   // 방송 팝업을 누른 건 디스코드 본창이 아님
 
   const relayout = () => layoutAll();
   screen.on('display-added', relayout);

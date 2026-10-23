@@ -91,12 +91,18 @@ function foregroundExe() {
 }
 
 // 디스코드가 맨 앞에 오거나 벗어날 때만 onChange(true/false)
-function watchForeground(onChange, intervalMs = 400) {
-  if (!load()) return () => {};
+// ignore(창 주소): 이 창이 맨 앞이면 상태를 안 바꿈 (방송 팝업을 눌렀을 때 등)
+function watchForeground(onChange, intervalMs = 400, ignore = () => false) {
+  const a = load();
+  if (!a) return () => {};
   let last = false;
   const timer = setInterval(() => {
     let now = false;
-    try { now = DISCORD.test(foregroundExe() || ''); } catch { now = false; }
+    try {
+      const h = a.GetForegroundWindow();
+      if (h && ignore(koffiAddress(h))) return;
+      now = DISCORD.test(foregroundExe() || '');
+    } catch { now = false; }
     if (now !== last) { last = now; onChange(now); }
   }, intervalMs);
   return () => clearInterval(timer);
@@ -186,6 +192,13 @@ function placeWindow(hwndNumber, { x, y, width, height }, topmost = true) {
   } catch { return false; }
 }
 
+// 다른 프로그램 창을 포커스 안 뺏고 최소화
+function minimizeWindow(hwndNumber) {
+  const a = load();
+  if (!a) return false;
+  try { return a.IsIconicN(hwndNumber) ? false : a.ShowWindowN(hwndNumber, 7); } catch { return false; }   // SW_SHOWMINNOACTIVE
+}
+
 // 다른 프로그램 창 닫기 (X 버튼 누른 것과 같음)
 function closeWindow(hwndNumber) {
   const a = load();
@@ -193,4 +206,4 @@ function closeWindow(hwndNumber) {
   try { return a.PostMessageN(hwndNumber, 0x0010, 0, 0); } catch { return false; }   // WM_CLOSE
 }
 
-module.exports = { closeWindow, hideTaskbarOver, restoreTaskbars, placeWindow, watchForeground, foregroundExe, windowInfo, foregroundWindow, restoreForeground, foregroundIsFullscreen, available: () => !!load() };
+module.exports = { minimizeWindow, closeWindow, hideTaskbarOver, restoreTaskbars, placeWindow, watchForeground, foregroundExe, windowInfo, foregroundWindow, restoreForeground, foregroundIsFullscreen, available: () => !!load() };
