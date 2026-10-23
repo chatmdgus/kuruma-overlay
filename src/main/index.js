@@ -78,11 +78,12 @@ function chatOnTop() {
 function sendSettings(cfg = config.get()) {
   const { overlays, appearance } = cfg;
   const bgOpacity = appearance.bgOpacity;
-  post(wins.chat, 'settings', { fadeSec: overlays.chat.fadeSec, maxLines: overlays.chat.maxLines, fontSize: overlays.chat.fontSize, bgOpacity });
-  post(wins.media, 'settings', { fadeSec: overlays.media.fadeSec, maxItems: overlays.media.maxItems });
+  const theme = appearance.theme || 'dark';
+  post(wins.chat, 'settings', { fadeSec: overlays.chat.fadeSec, maxLines: overlays.chat.maxLines, fontSize: overlays.chat.fontSize, bgOpacity, theme });
+  post(wins.media, 'settings', { fadeSec: overlays.media.fadeSec, maxItems: overlays.media.maxItems, theme });
   const g = overlays.gif;
-  post(wins.gif, 'settings', { src: g.file ? pathToFileURL(g.file).href : '', opacity: g.opacity ?? 1 });
-  post(wins.voice, 'settings', { scale: overlays.voice.scale, gap: overlays.voice.gap, showControls: overlays.voice.showControls, bgOpacity });
+  post(wins.gif, 'settings', { src: g.file ? pathToFileURL(g.file).href : '', opacity: g.opacity ?? 1, theme });
+  post(wins.voice, 'settings', { scale: overlays.voice.scale, gap: overlays.voice.gap, showControls: overlays.voice.showControls, bgOpacity, theme });
 }
 
 function registerHotkey(cfg = config.get()) {

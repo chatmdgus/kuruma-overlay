@@ -109,6 +109,7 @@ window.ui = (() => {
   }
 
   window.overlay.on('edit-mode', (on) => document.body.classList.toggle('editing', on));
+  window.overlay.on('settings', (s) => { if (s && s.theme && typeof applyTheme === 'function') applyTheme(s.theme); });
 
   return { colorFor, avatar, icon, bindStatus, clickable };
 })();

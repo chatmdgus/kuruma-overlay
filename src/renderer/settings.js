@@ -203,10 +203,41 @@ function fillMain() {
   bindSeg('media-fade', [5, 8, 10].map((v) => ({ label: `${v}초`, value: v })), () => o.media.fadeSec, (v) => { o.media.fadeSec = v; });
 
 
+  // 테마: 두 색 동그라미 (강조색 + 말풍선 바탕)
+  const paintThemes = () => {
+    const cur = THEMES[state.appearance.theme] ? state.appearance.theme : 'dark';
+    $('theme-name').textContent = THEMES[cur].label + (cur === 'dark' ? ' (기본)' : '');
+    for (const b of $('theme-pick').children) b.setAttribute('aria-checked', String(b.dataset.key === cur));
+    settingsAccent(cur);
+  };
+  $('theme-pick').replaceChildren(...THEME_ORDER.map((key) => {
+    const t = THEMES[key];
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'sw';
+    b.dataset.key = key;
+    b.title = t.label;
+    b.style.background = `linear-gradient(135deg, ${t.accent} 0 48%, rgb(${t.plate}) 52% 100%)`;
+    b.onmouseenter = () => { $('theme-name').textContent = t.label; };
+    b.onmouseleave = paintThemes;
+    b.onclick = () => { state.appearance.theme = key; paintThemes(); preview(); };
+    return b;
+  }));
+  paintThemes();
   bindSeg('bg-opacity', [{ label: '없음', value: 0 }, { label: '연하게', value: 0.3 }, { label: '보통', value: 0.5 }, { label: '진하게', value: 0.72 }],
     () => state.appearance.bgOpacity, (v) => { state.appearance.bgOpacity = v; });
   bindSeg('hide-discord', ONOFF, () => state.appearance.hideOnDiscord !== false, (v) => { state.appearance.hideOnDiscord = v; }, { live: false });
   bindSeg('at-login', ONOFF, () => !!state.launch.atLogin, (v) => { state.launch.atLogin = v; }, { live: false });
+}
+
+// 설정 창은 항상 어두운 바탕, 강조색만 테마를 따라감
+function settingsAccent(key) {
+  const t = THEMES[key] || THEMES.dark;
+  const r = document.documentElement.style;
+  r.setProperty('--accent', t.accent);
+  r.setProperty('--accent-ink', t.accentInk);
+  r.setProperty('--accent-rgb', hexRgb(t.accent));
+  r.setProperty('--chat', t.accent);
 }
 
 // ---------- 배치 무대 ----------
