@@ -1,6 +1,6 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
-const CHANNELS = ['settings', 'message', 'message-delete', 'media', 'voice', 'connection', 'input-mode', 'edit-mode', 'reset', 'target'];
+const CHANNELS = ['settings', 'message', 'message-delete', 'media', 'voice', 'connection', 'input-mode', 'edit-mode', 'reset', 'target', 'channels'];
 
 contextBridge.exposeInMainWorld('overlay', {
   on(channel, cb) {
@@ -11,4 +11,5 @@ contextBridge.exposeInMainWorld('overlay', {
   setClickable(on) { ipcRenderer.send('set-clickable', !!on); },
   openSettings() { ipcRenderer.send('open-settings'); },
   endInput() { ipcRenderer.send('end-input'); },
+  setTarget(id) { ipcRenderer.send('set-target', id || null); },
 });

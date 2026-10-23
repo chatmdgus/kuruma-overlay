@@ -40,11 +40,10 @@
         <p class="note" id="login-msg">브라우저에서 디스코드 승인 화면이 열려요. 승인하면 자동으로 연결돼요.</p>
 
         <details class="adv" id="adv">
-          <summary>고급: 토큰·채널 직접 지정</summary>
+          <summary>고급: 토큰 직접 지정</summary>
           <div class="rows">
             <label class="row"><span class="lb">토큰<small>디스코드 로그인 대신 쓰는 임시 방식</small></span>
               <span class="pair"><input type="password" id="token" spellcheck="false" autocomplete="off"><button type="button" id="token-show" class="ghost sm">보기</button></span></label>
-            <label class="row"><span class="lb">채팅 채널 ID<small>비우면 볼 수 있는 채널 전부. 여러 개면 쉼표로</small></span><input type="text" id="channel-ids" spellcheck="false"></label>
           </div>
         </details>
       </section>
@@ -78,6 +77,12 @@
         <p class="note">프리셋을 고르면 서브 모니터 크기·방향에 맞춰 놓임. 상자를 끌어서 옮기고, 테두리를 끌어서 크기를 조절함.</p>
         <div id="stage" class="stage"></div>
         <div class="chips" id="enabled" aria-label="표시할 오버레이"></div>
+      </section>
+
+      <section>
+        <header><h2>보는 채널</h2></header>
+        <p class="note" id="ch-note">전체를 켜두면 볼 수 있는 채널 전부. 몇 개만 보고 싶으면 그 채널만 골라요.</p>
+        <div class="chips wrap" id="ch-chips"></div>
       </section>
 
       <section>

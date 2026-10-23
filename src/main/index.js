@@ -22,7 +22,9 @@ let feedKey = '';
 let connection = { state: 'setup' };
 const channelNames = new Map();   // 채널 ID → 이름 (서버의 ready 메시지에서 받음)
 let sendChannelId = null;
-let lastMsgTs = 0;                // 마지막으로 글이 올라온 시각 (그 채널로 답장)         // 오버레이에서 쓴 글을 보낼 채널
+let lastMsgTs = 0;
+let manualTarget = false;         // 입력창에서 채널을 직접 골랐으면 자동으로 안 바꿈
+let channelList = [];             // 볼 수 있는 텍스트 채널 [{id, name}] (서버 순서)                // 마지막으로 글이 올라온 시각 (그 채널로 답장)         // 오버레이에서 쓴 글을 보낼 채널
 let tunnel = null;
 let tunnelKey = '';
 let tunnelState = { state: 'off' };
@@ -192,9 +194,22 @@ function endTyping() {
 }
 
 // 입력창에 "어느 채널로 보내는지" 표시. 채널을 따로 정하지 않았으면 볼 수 있는 첫 채팅 채널
+// 보내기 채널 후보 = 구독 중인 채널 (따로 고르지 않았으면 전부)
+function followedChannels(cfg = config.get()) {
+  const ids = cfg.subscribe.channelIds || [];
+  return ids.length ? channelList.filter((c) => ids.includes(c.id)) : channelList;
+}
+
+function postTarget() {
+  post(wins.chat, 'target', { id: sendChannelId, name: channelNames.get(sendChannelId) || null, auto: !manualTarget });
+}
+
 function sendTarget(cfg = config.get()) {
-  sendChannelId = MOCK ? 'mock' : (cfg.subscribe.channelIds[0] || [...channelNames.keys()][0] || null);
-  post(wins.chat, 'target', channelNames.get(sendChannelId) || null);
+  const list = followedChannels(cfg);
+  if (MOCK) sendChannelId = 'mock';
+  else if (!list.some((c) => c.id === sendChannelId)) { sendChannelId = list[0]?.id || null; manualTarget = false; }
+  post(wins.chat, 'channels', list);
+  postTarget();
 }
 
 function emit(type, payload) {
@@ -210,17 +225,19 @@ function emit(type, payload) {
       });
       for (const m of media) post(wins.media, 'media', m);
       // 채널을 따로 정하지 않았으면 마지막으로 글이 올라온 채널로 보냄 (입력 중에는 안 바꿈)
-      if (!MOCK && !config.get().subscribe.channelIds.length && (payload.ts || 0) > lastMsgTs && channelNames.has(payload.channelId) && !wins.chat.isFocused()) {
+      if (!MOCK && !manualTarget && (payload.ts || 0) > lastMsgTs && channelNames.has(payload.channelId) && !wins.chat.isFocused()) {
         lastMsgTs = payload.ts;
         sendChannelId = payload.channelId;
-        post(wins.chat, 'target', channelNames.get(sendChannelId));
+        postTarget();
       }
       break;
     }
     case 'ready': {
       channelNames.clear();
       lastMsgTs = 0;
-      for (const g of payload.guilds || []) for (const c of g.channels || []) if (c.type !== 'voice') channelNames.set(c.id, c.name);
+      channelList = [];
+      for (const g of payload.guilds || []) for (const c of g.channels || []) if (c.type !== 'voice') { channelNames.set(c.id, c.name); channelList.push({ id: c.id, name: c.name }); }
+      notifySettings('channels', channelList);
       sendTarget();
       break;
     }
@@ -246,6 +263,7 @@ function emit(type, payload) {
 const settingsDeps = {
   isQuitting: () => quitting,
   getUpdate: () => updater?.get() || null,
+  getChannels: () => channelList,
   update: (action) => { if (action === 'install') updater?.install(); else updater?.check(); },
   config,
   resolveDisplay: (role) => resolveDisplay(role),
@@ -340,6 +358,12 @@ app.whenReady().then(() => {
     if (text && feed && sendChannelId) feed.send(text, sendChannelId);   // 보내고 나서도 입력창은 그대로 (이어서 칠 수 있게)
   });
   ipcMain.on('end-input', () => endTyping());
+  // 입력창에서 보낼 채널 고르기 (null 이면 자동: 마지막 글이 올라온 채널)
+  ipcMain.on('set-target', (_e, id) => {
+    if (id && followedChannels().some((c) => c.id === id)) { sendChannelId = id; manualTarget = true; }
+    else manualTarget = false;
+    postTarget();
+  });
   ipcMain.on('open-settings', () => openSettings(settingsDeps));
   // 설정 버튼 위에 마우스가 있는 동안만 클릭을 받음 (채팅 입력 모드 중인 채팅 창은 건드리지 않음)
   ipcMain.on('set-clickable', (e, on) => {

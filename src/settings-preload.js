@@ -13,4 +13,5 @@ contextBridge.exposeInMainWorld('settingsApi', {
   logout: () => ipcRenderer.invoke('settings:logout'),
   update: (action) => ipcRenderer.invoke('settings:update', action),
   onUpdate: (cb) => ipcRenderer.on('update', (_e, u) => cb(u)),
+  onChannels: (cb) => ipcRenderer.on('channels', (_e, list) => cb(list)),
 });

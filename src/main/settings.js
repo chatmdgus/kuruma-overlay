@@ -30,6 +30,7 @@ function setupSettings(deps) {
       tunnel: deps.getTunnel(),
       mock: deps.isMock(),
       update: deps.getUpdate(),
+      channels: deps.getChannels(),
     };
   });
 

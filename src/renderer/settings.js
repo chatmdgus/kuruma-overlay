@@ -77,14 +77,13 @@ const splitIds = (v) => v.split(/[,\s]+/).map((x) => x.trim()).filter(Boolean);
 function fillSetup() {
   $('server-url').value = state.serverUrl || '';
   $('token').value = state.sessionToken || '';
-  $('channel-ids').value = (state.subscribe?.channelIds || []).join(', ');
   $('token-show').onclick = () => {
     const t = $('token');
     t.type = t.type === 'password' ? 'text' : 'password';
     $('token-show').textContent = t.type === 'password' ? '보기' : '숨기기';
   };
   // 예전 방식(토큰·채널)을 쓰고 있으면 고급 칸을 펼쳐 둠
-  $('adv').open = !!(state.sessionToken || state.subscribe?.channelIds?.length);
+  $('adv').open = !!state.sessionToken;
 
   const s = state.ssh;
   $('ssh-host').value = s.host || '';
@@ -159,7 +158,6 @@ function readSetup() {
   const port = Math.round(Number($('ssh-port').value)) || 8790;
   state.serverUrl = $('server-url').value.trim();
   state.sessionToken = $('token').value.trim();
-  state.subscribe = { guildId: '', channelIds: splitIds($('channel-ids').value), voiceChannelIds: [] };
   state.ssh = { ...state.ssh, host: $('ssh-host').value.trim(), user: $('ssh-user').value.trim() || 'ubuntu', keyPath: $('ssh-key').value.trim(), localPort: port, remotePort: port };
 }
 
@@ -167,7 +165,6 @@ function setupProblem() {
   const server = serverProblem();
   if (server) return server;
   if (!state.auth?.user && !state.sessionToken) return '디스코드로 로그인해 주세요';
-  if (state.subscribe.channelIds.some((id) => !/^\d{5,25}$/.test(id))) return '채팅 채널 ID는 숫자여야 해요';
   return '';
 }
 
@@ -494,6 +491,30 @@ async function pickGif() {
   preview();
   return true;
 }
+// 보는 채널: 전체(기본) 또는 고른 채널만. 목록은 서버에 연결되면 받아옴
+let channelList = [];
+function fillChannels() {
+  const ids = state.subscribe.channelIds || [];
+  const chip = (label, on, onclick) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'chip chat';
+    b.textContent = label;
+    b.setAttribute('aria-pressed', String(on));
+    b.onclick = onclick;
+    return b;
+  };
+  const set = (next) => { state.subscribe = { ...state.subscribe, channelIds: next }; fillChannels(); };
+  const chips = [chip('전체', !ids.length, () => set([]))];
+  for (const c of channelList) {
+    chips.push(chip(`#${c.name}`, ids.includes(c.id), () => set(ids.includes(c.id) ? ids.filter((x) => x !== c.id) : [...ids, c.id])));
+  }
+  $('ch-chips').replaceChildren(...chips);
+  $('ch-note').textContent = channelList.length
+    ? (ids.length ? `${ids.length}개 채널만 봐요. 저장하면 바로 바뀌어요.` : '전체: 볼 수 있는 채널을 전부 봐요. 몇 개만 보고 싶으면 그 채널만 골라요.')
+    : '서버에 연결되면 채널 목록이 보여요.';
+}
+
 function fillChipsGif() {
   const chip = document.querySelector('.chip.gif');
   if (chip) chip.setAttribute('aria-pressed', String(state.overlays.gif.enabled));
@@ -541,8 +562,11 @@ window.addEventListener('resize', () => state && render());
   window.settingsApi.onTunnel(showTunnel);
   showUpdate(res.update);
   window.settingsApi.onUpdate(showUpdate);
+  channelList = res.channels || [];
+  window.settingsApi.onChannels((list) => { channelList = list || []; fillChannels(); });
 
   fillSetup();
   fillMain();
+  fillChannels();
   showView(res.mock || isConfigured(res.config) ? 'main' : 'setup');
 })();
