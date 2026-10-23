@@ -12,7 +12,7 @@ const { setupSettings, openSettings, notifySettings } = require('./settings');
 const { createTray } = require('./tray');
 const { startTunnel } = require('./tunnel');
 const { login, describeLoginError } = require('./login');
-const { hideTaskbarOver, restoreTaskbars, placeWindow, watchForeground, windowInfo, foregroundWindow, restoreForeground, foregroundIsFullscreen } = require('./foreground');
+const { closeWindow, hideTaskbarOver, restoreTaskbars, placeWindow, watchForeground, windowInfo, foregroundWindow, restoreForeground, foregroundIsFullscreen } = require('./foreground');
 const { shell, desktopCapturer } = require('electron');
 const { setupUpdater } = require('./updater');
 
@@ -92,6 +92,27 @@ function discordPopouts(all) {
   if (!main) main = dc.reduce((a, b) => (a.width * a.height >= b.width * b.height ? a : b));
   return dc.filter((w) => w !== main);
 }
+// 방송이 끝나면 그 방송 팝업을 자동으로 닫음 (디스코드 팝업 자동 찾기일 때만)
+// 음성 채널의 "화면 공유 중" 목록을 보고: 끝난 사람 이름이 제목에 있는 팝업을 닫고,
+// 방송하는 사람이 아무도 없게 되면(또는 내가 음성 채널을 나가면) 남은 팝업을 전부 닫음
+const streamers = new Map();   // 채널 → 방송 중인 사람 이름들
+let lastPopouts = [];          // 마지막으로 찾은 디스코드 팝업 {id, name}
+function onStreams(payload) {
+  const key = payload.follow ? 'follow' : String(payload.channelId || '');
+  const before = new Set([...streamers.values()].flatMap((s) => [...s]));
+  streamers.set(key, new Set((payload.members || []).filter((m) => m.streaming).map((m) => m.name).filter(Boolean)));
+  const now = new Set([...streamers.values()].flatMap((s) => [...s]));
+  const ended = [...before].filter((n) => !now.has(n));
+  const o = config.get().overlays.mirror;
+  if (!ended.length || !o.enabled || o.mode === 'pick' || o.autoClose === false || !lastPopouts.length) return;
+  const targets = now.size ? lastPopouts.filter((w) => ended.some((n) => w.name.includes(n))) : lastPopouts;
+  for (const w of targets) {
+    const n = Number(String(w.id).split(':')[1]);
+    if (Number.isFinite(n)) closeWindow(n);
+  }
+  if (targets.length) setTimeout(() => syncMirror().catch(() => {}), 800);
+}
+
 // 창 목록은 맨 앞에 있는 순서로 오기 때문에 팝업을 누를 때마다 순서가 바뀜
 // → 처음 보인 순서대로 고정 (새 창은 뒤에 붙고, 닫힌 창은 빠짐)
 const seenOrder = new Map();
@@ -112,6 +133,7 @@ async function syncMirror(cfg = config.get()) {
     } catch (e) { console.error('[mirror]', e.message); }
   }
   picked = stableOrder(picked).slice(0, 4).map(({ id, name }) => ({ id, name }));
+  lastPopouts = o.enabled && o.mode !== 'pick' ? picked : [];
   lastPicked = picked;
   const arrange = (o.show || 'arrange') === 'arrange';
   if (arrange) arrangeWindows(picked, cfg);
@@ -403,6 +425,7 @@ function emit(type, payload) {
       post(wins.chat, 'message-delete', payload.id);
       break;
     case 'voice':
+      onStreams(payload);
       post(wins.voice, 'voice', { channelName: payload.channelName || null, members: payload.members || [] });
       break;
     case 'connection':

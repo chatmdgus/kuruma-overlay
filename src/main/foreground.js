@@ -31,6 +31,7 @@ function load() {
       SetWindowPosN: user32.func('bool __stdcall SetWindowPos(intptr_t hWnd, intptr_t hWndInsertAfter, int X, int Y, int cx, int cy, uint32_t uFlags)'),
       IsIconicN: user32.func('bool __stdcall IsIconic(intptr_t hWnd)'),
       ShowWindowN: user32.func('bool __stdcall ShowWindow(intptr_t hWnd, int nCmdShow)'),
+      PostMessageN: user32.func('bool __stdcall PostMessageW(intptr_t hWnd, uint32_t Msg, uintptr_t wParam, intptr_t lParam)'),
       ShowWindow: user32.func('bool __stdcall ShowWindow(void *hWnd, int nCmdShow)'),
       IsWindowVisible: user32.func('bool __stdcall IsWindowVisible(void *hWnd)'),
       FindWindowExW: user32.func('void * __stdcall FindWindowExW(void *hWndParent, void *hWndChildAfter, str16 lpszClass, str16 lpszWindow)'),
@@ -185,4 +186,11 @@ function placeWindow(hwndNumber, { x, y, width, height }, topmost = true) {
   } catch { return false; }
 }
 
-module.exports = { hideTaskbarOver, restoreTaskbars, placeWindow, watchForeground, foregroundExe, windowInfo, foregroundWindow, restoreForeground, foregroundIsFullscreen, available: () => !!load() };
+// 다른 프로그램 창 닫기 (X 버튼 누른 것과 같음)
+function closeWindow(hwndNumber) {
+  const a = load();
+  if (!a) return false;
+  try { return a.PostMessageN(hwndNumber, 0x0010, 0, 0); } catch { return false; }   // WM_CLOSE
+}
+
+module.exports = { closeWindow, hideTaskbarOver, restoreTaskbars, placeWindow, watchForeground, foregroundExe, windowInfo, foregroundWindow, restoreForeground, foregroundIsFullscreen, available: () => !!load() };
