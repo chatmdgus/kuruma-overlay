@@ -25,11 +25,41 @@ function load() {
       GetWindowRect: user32.func('bool __stdcall GetWindowRect(void *hWnd, _Out_ RECT *lpRect)'),
       MonitorFromWindow: user32.func('void * __stdcall MonitorFromWindow(void *hWnd, uint32_t dwFlags)'),
       GetMonitorInfoW: user32.func('bool __stdcall GetMonitorInfoW(void *hMonitor, _Inout_ MONITORINFO *lpmi)'),
+      // 창 번호(숫자)로 부르는 버전: desktopCapturer 의 "window:<번호>:0" 용
+      PidOfN: user32.func('uint32_t __stdcall GetWindowThreadProcessId(intptr_t hWnd, _Out_ uint32_t *lpdwProcessId)'),
+      RectOfN: user32.func('bool __stdcall GetWindowRect(intptr_t hWnd, _Out_ RECT *lpRect)'),
     };
   } catch (e) {
     console.error('[foreground] 사용할 수 없음:', e.message);
   }
   return api;
+}
+
+function exeOfPid(a, pid) {
+  if (!pid) return null;
+  const h = a.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid);
+  if (!h) return null;
+  try {
+    const buf = Buffer.alloc(1040);
+    const size = [520];
+    if (!a.QueryFullProcessImageNameW(h, 0, buf, size)) return null;
+    return buf.toString('utf16le', 0, size[0] * 2).split('\\').pop();
+  } finally {
+    a.CloseHandle(h);
+  }
+}
+
+// 창 번호로 실행 파일 이름과 크기 (방송 팝업 찾기용)
+function windowInfo(hwndNumber) {
+  const a = load();
+  if (!a) return null;
+  try {
+    const pid = [0];
+    a.PidOfN(hwndNumber, pid);
+    const r = {};
+    a.RectOfN(hwndNumber, r);
+    return { exe: exeOfPid(a, pid[0]), width: (r.right || 0) - (r.left || 0), height: (r.bottom || 0) - (r.top || 0) };
+  } catch { return null; }
 }
 
 // 맨 앞 창의 실행 파일 이름 (예: Discord.exe). 모르면 null
@@ -100,4 +130,4 @@ function koffiAddress(h) {
   try { return require('koffi').address(h); } catch { return h; }
 }
 
-module.exports = { watchForeground, foregroundExe, foregroundWindow, restoreForeground, foregroundIsFullscreen, available: () => !!load() };
+module.exports = { watchForeground, foregroundExe, windowInfo, foregroundWindow, restoreForeground, foregroundIsFullscreen, available: () => !!load() };

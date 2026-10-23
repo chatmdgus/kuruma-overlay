@@ -1,6 +1,6 @@
 const $ = (id) => document.getElementById(id);
 // 음성은 디스코드 기본 오버레이를 쓰기로 해서 설정에서 뺌 (코드는 남겨둠)
-const NAMES = { chat: '채팅', media: '사진·영상', gif: '내 GIF' };
+const NAMES = { chat: '채팅', media: '사진·영상', gif: '내 GIF', mirror: '방송 화면' };
 const SNAP = 0.015;
 const MIN = 0.04;
 
@@ -197,6 +197,11 @@ function fillMain() {
   bindSeg('chat-lines', [5, 8, 12].map((v) => ({ label: `${v}줄`, value: v })), () => o.chat.maxLines, (v) => { o.chat.maxLines = v; });
 
   bindSeg('media-max', [1, 2, 3].map((v) => ({ label: `${v}장`, value: v })), () => o.media.maxItems, (v) => { o.media.maxItems = v; });
+  // 방송 화면 (창 비추기)
+  bindSeg('mirror-mode', [{ label: '디스코드 팝업 자동', value: 'discord' }, { label: '직접 고르기', value: 'pick' }],
+    () => o.mirror.mode || 'discord', (v) => { o.mirror.mode = v; paintMirror(); });
+  $('mirror-refresh').onclick = () => paintMirror(true);
+  paintMirror();
   // 내 GIF
   const paintGif = () => { $('gif-name').textContent = o.gif.file ? o.gif.name || 'GIF' : '아직 안 골랐음'; $('gif-clear').hidden = !o.gif.file; };
   paintGif();
@@ -351,7 +356,7 @@ function render() {
   }
 
   // 채팅이 항상 위에 오게 사진·영상을 먼저 그림
-  for (const name of ['gif', 'media', 'chat']) {
+  for (const name of ['gif', 'mirror', 'media', 'chat']) {
     const r = overlayStageRect(name);
     const el = document.createElement('div');
     el.className = `box ${name}` + (state.overlays[name].enabled ? '' : ' off');
@@ -597,6 +602,41 @@ function fillChannels() {
   $('ch-note').textContent = channelList.length
     ? (ids.length ? `${ids.length}개 채널만 봐요. 저장하면 바로 바뀌어요.` : '전체: 볼 수 있는 채널을 전부 봐요. 몇 개만 보고 싶으면 그 채널만 골라요.')
     : '서버에 연결되면 채널 목록이 보여요.';
+}
+
+// 방송 화면 "직접 고르기": 열린 창을 미리보기와 같이 보여주고 최대 4개 고름 (창 제목으로 기억)
+let windowCache = null;
+async function paintMirror(refresh) {
+  const o = state.overlays.mirror;
+  const pickMode = o.mode === 'pick';
+  $('mirror-pick').hidden = !pickMode;
+  $('mirror-note').textContent = pickMode
+    ? `고른 창 ${(o.titles || []).length}개 · 최대 4개`
+    : '디스코드에서 방송을 팝업으로 띄우면 자동으로 보여요 (여러 개면 칸을 나눔)';
+  if (!pickMode) return;
+  if (refresh || !windowCache) {
+    $('mirror-list').textContent = '창 목록 불러오는 중…';
+    windowCache = await window.settingsApi.listWindows();
+  }
+  const titles = o.titles || [];
+  const cards = windowCache.map((w) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'win';
+    b.setAttribute('aria-pressed', String(titles.includes(w.name)));
+    if (w.thumb) { const img = document.createElement('img'); img.src = w.thumb; img.alt = ''; b.append(img); }
+    const t = document.createElement('span');
+    t.textContent = w.name;
+    b.append(t);
+    b.onclick = () => {
+      const cur = o.titles || [];
+      o.titles = cur.includes(w.name) ? cur.filter((x) => x !== w.name) : [...cur, w.name].slice(-4);
+      paintMirror();
+      preview();
+    };
+    return b;
+  });
+  $('mirror-list').replaceChildren(...(cards.length ? cards : [Object.assign(document.createElement('p'), { className: 'note', textContent: '비출 수 있는 창이 없어요' })]));
 }
 
 function fillChipsGif() {

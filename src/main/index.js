@@ -12,8 +12,8 @@ const { setupSettings, openSettings, notifySettings } = require('./settings');
 const { createTray } = require('./tray');
 const { startTunnel } = require('./tunnel');
 const { login, describeLoginError } = require('./login');
-const { watchForeground, foregroundWindow, restoreForeground, foregroundIsFullscreen } = require('./foreground');
-const { shell } = require('electron');
+const { watchForeground, windowInfo, foregroundWindow, restoreForeground, foregroundIsFullscreen } = require('./foreground');
+const { shell, desktopCapturer } = require('electron');
 const { setupUpdater } = require('./updater');
 
 const MOCK = process.argv.includes('--mock');
@@ -61,7 +61,8 @@ function layoutAll(cfg = config.get()) {
     const o = cfg.overlays[name];
     // 음성 오버레이는 쓰지 않음 (디스코드 기본 오버레이 사용)
     const hideForDiscord = discordFront && cfg.appearance.hideOnDiscord;
-    const noGif = name === 'gif' && !o.file && !editing;   // GIF 를 아직 안 골랐으면 숨김 (배치 중엔 자리 표시)
+    const noGif = (name === 'gif' && !o.file && !editing)   // GIF 를 아직 안 골랐으면 숨김 (배치 중엔 자리 표시)
+      || (name === 'mirror' && mirrorKey === '[]' && !editing);   // 비출 창이 없으면 숨김
     if (!o.enabled || userHidden || hideForDiscord || noGif || name === 'voice') { win.hide(); continue; }
     const d = resolveDisplay(o.monitor, cfg);
     const tall = d.bounds.height > d.bounds.width;
@@ -72,6 +73,43 @@ function layoutAll(cfg = config.get()) {
 }
 
 // 채팅 창이 사진 창과 겹치면 채팅이 위에 오게
+// ---------- 방송 화면 (창 비추기) ----------
+// 3초마다 창 목록을 보고 비출 창을 정해서 mirror 창에 넘김 (창이 바뀐 칸만 다시 연결)
+let mirrorKey = '[]';
+async function listWindows() {
+  const sources = await desktopCapturer.getSources({ types: ['window'], thumbnailSize: { width: 0, height: 0 }, fetchWindowIcons: false });
+  return sources.map((s) => {
+    const n = Number(String(s.id).split(':')[1]);
+    const info = Number.isFinite(n) ? windowInfo(n) : null;
+    return { id: s.id, name: s.name, exe: info?.exe || '', width: info?.width || 0, height: info?.height || 0 };
+  });
+}
+// 디스코드 방송 팝업 자동 찾기: Discord.exe 창 중 본창("… - Discord", 없으면 가장 큰 창)을 뺀 나머지
+function discordPopouts(all) {
+  const dc = all.filter((w) => /^discord(ptb|canary)?\.exe$/i.test(w.exe) && !/updater|overlay/i.test(w.name) && w.width > 120 && w.height > 90);
+  if (!dc.length) return [];
+  let main = dc.find((w) => / - Discord$/.test(w.name));
+  if (!main) main = dc.reduce((a, b) => (a.width * a.height >= b.width * b.height ? a : b));
+  return dc.filter((w) => w !== main);
+}
+async function syncMirror(cfg = config.get()) {
+  const o = cfg.overlays.mirror;
+  let picked = [];
+  if (o.enabled && !MOCK) {
+    try {
+      const all = await listWindows();
+      picked = o.mode === 'pick' ? all.filter((w) => (o.titles || []).includes(w.name)) : discordPopouts(all);
+    } catch (e) { console.error('[mirror]', e.message); }
+  }
+  picked = picked.slice(0, 4).map(({ id, name }) => ({ id, name }));
+  const key = JSON.stringify(picked);
+  if (key === mirrorKey) return;
+  const wasEmpty = mirrorKey === '[]';
+  mirrorKey = key;
+  post(wins.mirror, 'mirror-sources', picked);
+  if (wasEmpty !== (key === '[]')) layoutAll();   // 비출 창이 생기거나 없어지면 보이기/숨기기
+}
+
 function chatOnTop() {
   const c = wins.chat;
   if (c && !c.isDestroyed() && c.isVisible()) c.moveTop();
@@ -85,6 +123,7 @@ function sendSettings(cfg = config.get()) {
   post(wins.media, 'settings', { fadeSec: overlays.media.fadeSec, maxItems: overlays.media.maxItems, theme });
   const g = overlays.gif;
   post(wins.gif, 'settings', { src: g.file ? pathToFileURL(g.file).href : '', opacity: g.opacity ?? 1, theme });
+  post(wins.mirror, 'settings', { fps: overlays.mirror.fps || 30, theme });
   post(wins.voice, 'settings', { scale: overlays.voice.scale, gap: overlays.voice.gap, showControls: overlays.voice.showControls, bgOpacity, theme });
 }
 
@@ -175,6 +214,7 @@ function startFeed(cfg = config.get()) {
 
 function applyConfig(cfg) {
   layoutAll(cfg);
+  syncMirror(cfg);
   sendSettings(cfg);
   registerHotkey(cfg);
   syncInputOn(cfg);
@@ -302,6 +342,15 @@ const settingsDeps = {
   isQuitting: () => quitting,
   getUpdate: () => updater?.get() || null,
   getChannels: () => channelList,
+  // 방송 화면 "직접 고르기": 지금 열린 창 목록 (작은 미리보기 포함, 이 앱 창은 뺌)
+  listWindows: async () => {
+    const sources = await desktopCapturer.getSources({ types: ['window'], thumbnailSize: { width: 240, height: 135 }, fetchWindowIcons: false });
+    const own = new Set(alive().map((w) => w.getMediaSourceId()));
+    return sources.filter((s) => !own.has(s.id) && s.name && !/^Kuruma Overlay/.test(s.name)).slice(0, 40).map((s) => {
+      const n = Number(String(s.id).split(':')[1]);
+      return { name: s.name, exe: (Number.isFinite(n) && windowInfo(n)?.exe) || '', thumb: s.thumbnail.isEmpty() ? '' : s.thumbnail.toDataURL() };
+    });
+  },
   getHotkey: () => ({ accel: config.get().hotkeys.input, ok: registeredHotkey === config.get().hotkeys.input }),
   testHotkey,
   update: (action) => { if (action === 'install') updater?.install(); else updater?.check(); },
@@ -342,7 +391,7 @@ const settingsDeps = {
 };
 
 app.whenReady().then(() => {
-  for (const name of ['gif', 'media', 'chat', 'voice']) {   // 만든 순서대로 쌓임: GIF가 맨 아래
+  for (const name of ['gif', 'mirror', 'media', 'chat', 'voice']) {   // 만든 순서대로 쌓임: GIF가 맨 아래
     wins[name] = makeOverlay(path.join(__dirname, '..', 'renderer', `${name}.html`));
   }
 
@@ -390,6 +439,8 @@ app.whenReady().then(() => {
     const key = `${u.state}:${u.version || ''}:${Math.floor((u.percent || 0) / 10)}`;
     if (key !== lastUpdateKey) { lastUpdateKey = key; trayApi?.refresh(); }
   });
+
+  setInterval(() => syncMirror(), 3000);
 
   trayApi = createTray({
     getUpdate: () => updater?.get(),

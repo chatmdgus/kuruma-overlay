@@ -14,6 +14,7 @@
   --media: #7be0a8;
   --voice: #ffb86b;
   --gif: #ffb86b;
+  --mirror: #8fd8ff;
 }
 
 * { box-sizing: border-box; }
@@ -81,6 +82,7 @@ input[type=text]:focus, input[type=password]:focus { border-color: var(--accent)
 .box.off { display: none; }
 .box.chat { border-color: var(--chat); background: rgba(var(--accent-rgb), 0.16); color: var(--chat); }
 .box.media { border-color: var(--media); background: rgba(123, 224, 168, 0.16); color: var(--media); }
+.box.mirror { border-color: var(--mirror); background: rgba(143, 216, 255, 0.14); color: var(--mirror); }
 .box.gif { border-color: var(--gif); background: rgba(255, 184, 107, 0.16); color: var(--gif); }
 .box.voice { border-color: var(--voice); background: rgba(255, 184, 107, 0.16); color: var(--voice); }
 .box.chat { z-index: 2; }
@@ -93,6 +95,7 @@ input[type=text]:focus, input[type=password]:focus { border-color: var(--accent)
 .chip { height: 32px; padding: 0 14px; border-radius: 999px; background: transparent; color: var(--muted); box-shadow: inset 0 0 0 1.5px var(--line); }
 .chip[aria-pressed=true].chat { color: var(--chat); box-shadow: inset 0 0 0 1.5px var(--chat); background: rgba(var(--accent-rgb), 0.12); }
 .chip[aria-pressed=true].media { color: var(--media); box-shadow: inset 0 0 0 1.5px var(--media); background: rgba(123, 224, 168, 0.12); }
+.chip[aria-pressed=true].mirror { color: var(--mirror); box-shadow: inset 0 0 0 1.5px var(--mirror); background: rgba(143, 216, 255, 0.12); }
 .chip[aria-pressed=true].gif { color: var(--gif); box-shadow: inset 0 0 0 1.5px var(--gif); background: rgba(255, 184, 107, 0.12); }
 .chip[aria-pressed=true].voice { color: var(--voice); box-shadow: inset 0 0 0 1.5px var(--voice); background: rgba(255, 184, 107, 0.12); }
 .chip[aria-pressed=false] { text-decoration: line-through; }
@@ -143,3 +146,10 @@ button.key { min-width: 150px; font-family: inherit; font-weight: 700; letter-sp
 button.key.rec { box-shadow: inset 0 0 0 1.5px var(--accent); color: var(--accent); animation: rec 1s ease-in-out infinite alternate; }
 @keyframes rec { to { box-shadow: inset 0 0 0 1.5px rgba(var(--accent-rgb), 0.35); } }
 .lb small.bad { color: var(--danger); }
+
+/* 방송 화면: 창 고르기 */
+.wins { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; margin-top: 8px; }
+.win { height: auto; display: flex; flex-direction: column; align-items: stretch; gap: 6px; padding: 6px; border-radius: 10px; background: var(--panel); box-shadow: inset 0 0 0 1px var(--line); color: var(--muted); font-size: 12px; text-align: left; cursor: pointer; }
+.win img { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 6px; background: #000; }
+.win span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.win[aria-pressed=true] { color: var(--ink); box-shadow: inset 0 0 0 2px var(--mirror); }

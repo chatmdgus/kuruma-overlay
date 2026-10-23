@@ -17,4 +17,5 @@ contextBridge.exposeInMainWorld('settingsApi', {
   onHotkey: (cb) => ipcRenderer.on('hotkey', (_e, h) => cb(h)),
   onInput: (cb) => ipcRenderer.on('input', (_e, on) => cb(on)),
   testHotkey: (accel) => ipcRenderer.invoke('settings:test-hotkey', accel),
+  listWindows: () => ipcRenderer.invoke('settings:list-windows'),
 });

@@ -305,3 +305,12 @@ body.editing .gif-empty:not([hidden]) { display: block; }
 .msg .stickers { display: flex; gap: 0.4em; margin-top: 0.35em; }
 .msg .sticker { width: 6.2em; height: 6.2em; object-fit: contain; display: block; animation: gif-pop 0.45s cubic-bezier(0.2, 1.4, 0.4, 1) both; }
 .msg .sticker.lottie { display: grid; place-items: center; color: var(--ink-soft); font-size: 0.85em; }
+
+/* 방송 화면 (창 비추기) */
+.mirror { position: fixed; inset: 0; display: grid; gap: 6px; padding: 4px; box-sizing: border-box; }
+.mirror .tile { position: relative; min-width: 0; min-height: 0; display: grid; place-items: center; }
+.mirror .tile video { display: block; border-radius: 12px; background: #000; box-shadow: 0 0 0 1px var(--edge), 0 6px 20px rgba(0, 0, 0, 0.35); }
+.mirror .tile-name { position: absolute; left: 8px; bottom: 6px; max-width: calc(100% - 16px); padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; color: var(--ink); background: rgba(var(--plate), 0.7); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; opacity: 0; transition: opacity 0.2s; }
+body.editing .mirror .tile-name { opacity: 1; }
+.mirror-empty { position: fixed; inset: 0; display: none; place-items: center; }
+body.editing .mirror-empty:not([hidden]) { display: grid; }

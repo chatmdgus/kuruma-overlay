@@ -52,6 +52,7 @@ function setupSettings(deps) {
   ipcMain.handle('settings:logout', () => deps.logout());
   ipcMain.handle('settings:update', (_e, action) => deps.update(action));
   ipcMain.handle('settings:test-hotkey', (_e, accel) => deps.testHotkey(String(accel || '')));
+  ipcMain.handle('settings:list-windows', () => deps.listWindows().catch(() => []));
 
   // 내 GIF 고르기: 원본을 옮기거나 지워도 계속 보이게 설정 폴더에 복사해 둠
   ipcMain.handle('settings:pick-gif', async () => {

@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
   <meta charset="utf-8">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'; font-src 'self'; script-src 'self'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'; font-src 'self'; script-src 'self'; img-src 'self' data:">
   <title>Kuruma Overlay 설정</title>
   <link rel="stylesheet" href="fonts.css">
   <link rel="stylesheet" href="settings.css">
@@ -101,6 +101,18 @@
         <div class="rows">
           <div class="row"><span class="lb">한 번에 보일 개수</span><span class="seg" id="media-max"></span></div>
           <div class="row"><span class="lb">사라지는 시간</span><span class="seg" id="media-fade"></span></div>
+        </div>
+      </section>
+
+      <section>
+        <header><h2>방송 화면</h2></header>
+        <p class="note" id="mirror-note"></p>
+        <div class="rows">
+          <div class="row"><span class="lb">비출 창<small>팝업 창은 열어 둬야 함 (최소화하면 안 보임)</small></span><span class="seg" id="mirror-mode"></span></div>
+        </div>
+        <div id="mirror-pick" hidden>
+          <div class="row"><span class="lb">열린 창</span><button type="button" id="mirror-refresh" class="ghost sm">새로고침</button></div>
+          <div class="wins" id="mirror-list"></div>
         </div>
       </section>
 
