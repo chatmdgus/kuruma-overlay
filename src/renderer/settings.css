@@ -12,6 +12,7 @@
   --chat: #ff6b7a;
   --media: #7be0a8;
   --voice: #ffb86b;
+  --gif: #ffb86b;
 }
 
 * { box-sizing: border-box; }
@@ -79,6 +80,7 @@ input[type=text]:focus, input[type=password]:focus { border-color: var(--accent)
 .box.off { display: none; }
 .box.chat { border-color: var(--chat); background: rgba(255, 107, 122, 0.16); color: var(--chat); }
 .box.media { border-color: var(--media); background: rgba(123, 224, 168, 0.16); color: var(--media); }
+.box.gif { border-color: var(--gif); background: rgba(255, 184, 107, 0.16); color: var(--gif); }
 .box.voice { border-color: var(--voice); background: rgba(255, 184, 107, 0.16); color: var(--voice); }
 .box.chat { z-index: 2; }
 .box.dragging { z-index: 3; }
@@ -89,6 +91,7 @@ input[type=text]:focus, input[type=password]:focus { border-color: var(--accent)
 .chip { height: 32px; padding: 0 14px; border-radius: 999px; background: transparent; color: var(--muted); box-shadow: inset 0 0 0 1.5px var(--line); }
 .chip[aria-pressed=true].chat { color: var(--chat); box-shadow: inset 0 0 0 1.5px var(--chat); background: rgba(255, 107, 122, 0.12); }
 .chip[aria-pressed=true].media { color: var(--media); box-shadow: inset 0 0 0 1.5px var(--media); background: rgba(123, 224, 168, 0.12); }
+.chip[aria-pressed=true].gif { color: var(--gif); box-shadow: inset 0 0 0 1.5px var(--gif); background: rgba(255, 184, 107, 0.12); }
 .chip[aria-pressed=true].voice { color: var(--voice); box-shadow: inset 0 0 0 1.5px var(--voice); background: rgba(255, 184, 107, 0.12); }
 .chip[aria-pressed=false] { text-decoration: line-through; }
 
@@ -124,3 +127,4 @@ button.discord.busy::after { content: ''; display: inline-block; width: 12px; he
 details.adv { margin-top: 14px; border-radius: 12px; background: var(--panel); padding: 2px 16px; }
 details.adv summary { cursor: pointer; padding: 10px 0; color: var(--muted); font-weight: 600; font-size: 13px; }
 details.adv[open] summary { color: var(--ink); }
+.btns { display: flex; gap: 6px; }

@@ -1,6 +1,6 @@
 const $ = (id) => document.getElementById(id);
 // 음성은 디스코드 기본 오버레이를 쓰기로 해서 설정에서 뺌 (코드는 남겨둠)
-const NAMES = { chat: '채팅', media: '사진·영상' };
+const NAMES = { chat: '채팅', media: '사진·영상', gif: '내 GIF' };
 const SNAP = 0.015;
 const MIN = 0.04;
 
@@ -183,7 +183,10 @@ function fillMain() {
     b.className = `chip ${name}`;
     b.textContent = NAMES[name];
     const paint = () => b.setAttribute('aria-pressed', String(o[name].enabled));
-    b.onclick = () => { o[name].enabled = !o[name].enabled; paint(); render(); preview(); };
+    b.onclick = async () => {
+      if (name === 'gif' && !o.gif.enabled && !o.gif.file && !(await pickGif())) return;   // 처음 켤 때 GIF부터 고르기
+      o[name].enabled = !o[name].enabled; paint(); render(); preview();
+    };
     paint();
     return b;
   });
@@ -194,6 +197,12 @@ function fillMain() {
   bindSeg('chat-lines', [5, 8, 12].map((v) => ({ label: `${v}줄`, value: v })), () => o.chat.maxLines, (v) => { o.chat.maxLines = v; });
 
   bindSeg('media-max', [1, 2, 3].map((v) => ({ label: `${v}장`, value: v })), () => o.media.maxItems, (v) => { o.media.maxItems = v; });
+  // 내 GIF
+  const paintGif = () => { $('gif-name').textContent = o.gif.file ? o.gif.name || 'GIF' : '아직 안 골랐음'; $('gif-clear').hidden = !o.gif.file; };
+  paintGif();
+  $('gif-pick').onclick = async () => { if (await pickGif()) { paintGif(); fillChipsGif(); } };
+  $('gif-clear').onclick = () => { o.gif.file = ''; o.gif.name = ''; o.gif.enabled = false; paintGif(); fillChipsGif(); render(); preview(); };
+  bindSeg('gif-opacity', [1, 0.8, 0.6, 0.4].map((v) => ({ label: `${Math.round(v * 100)}%`, value: v })), () => o.gif.opacity ?? 1, (v) => { o.gif.opacity = v; });
   bindSeg('media-fade', [5, 8, 10].map((v) => ({ label: `${v}초`, value: v })), () => o.media.fadeSec, (v) => { o.media.fadeSec = v; });
 
 
@@ -262,7 +271,7 @@ function render() {
   }
 
   // 채팅이 항상 위에 오게 사진·영상을 먼저 그림
-  for (const name of ['media', 'chat']) {
+  for (const name of ['gif', 'media', 'chat']) {
     const r = overlayStageRect(name);
     const el = document.createElement('div');
     el.className = `box ${name}` + (state.overlays[name].enabled ? '' : ' off');
@@ -476,10 +485,24 @@ function presetRects(id, b) {
   const ratio = (r) => ({ x: round(r.x / W), y: round(r.y / H), w: round(r.w / W), h: round(r.h / H) });
   return { chat: ratio(chat), media: ratio(media) };
 }
+// GIF 고르기 → 설정 폴더에 복사된 경로를 받아서 켬
+async function pickGif() {
+  const r = await window.settingsApi.pickGif();
+  if (!r) return false;
+  Object.assign(state.overlays.gif, { file: r.file, name: r.name, enabled: true });
+  render();
+  preview();
+  return true;
+}
+function fillChipsGif() {
+  const chip = document.querySelector('.chip.gif');
+  if (chip) chip.setAttribute('aria-pressed', String(state.overlays.gif.enabled));
+}
+
 function applyPreset(id) {
   const d = displayById(roleId('sub'));
   const rects = presetRects(id, d.bounds);
-  for (const name of Object.keys(NAMES)) {
+  for (const name of Object.keys(rects)) {   // 프리셋은 채팅·사진만 (GIF는 그대로)
     const o = state.overlays[name];
     o.monitor = 'sub';
     o[rectKey(o)] = rects[name];

@@ -1,5 +1,6 @@
 const { app, screen, globalShortcut, ipcMain, BrowserWindow, safeStorage } = require('electron');
 const path = require('path');
+const { pathToFileURL } = require('url');
 
 // 개발 실행(npm start)과 설치본이 같은 설정 폴더를 쓰게 고정
 app.setPath('userData', path.join(app.getPath('appData'), 'kuruma-overlay'));
@@ -28,7 +29,8 @@ let inputMode = false;
 let userHidden = false;
 let registeredHotkey = null;
 let quitting = false;
-let discordFront = false;          // 디스코드 창이 맨 앞에 있는지
+let discordFront = false;
+let editing = false;               // 설정 창이 열려 있으면 GIF 자리도 보여줌          // 디스코드 창이 맨 앞에 있는지
 let updater = null;
 let trayApi = null;
 let lastUpdateKey = '';
@@ -54,7 +56,8 @@ function layoutAll(cfg = config.get()) {
     const o = cfg.overlays[name];
     // 음성 오버레이는 쓰지 않음 (디스코드 기본 오버레이 사용)
     const hideForDiscord = discordFront && cfg.appearance.hideOnDiscord;
-    if (!o.enabled || userHidden || hideForDiscord || name === 'voice') { win.hide(); continue; }
+    const noGif = name === 'gif' && !o.file && !editing;   // GIF 를 아직 안 골랐으면 숨김 (배치 중엔 자리 표시)
+    if (!o.enabled || userHidden || hideForDiscord || noGif || name === 'voice') { win.hide(); continue; }
     const d = resolveDisplay(o.monitor, cfg);
     const tall = d.bounds.height > d.bounds.width;
     placeOverlay(win, d, tall ? (o.rectTall || config.DEFAULTS.overlays[name].rectTall) : o.rect);
@@ -74,6 +77,8 @@ function sendSettings(cfg = config.get()) {
   const bgOpacity = appearance.bgOpacity;
   post(wins.chat, 'settings', { fadeSec: overlays.chat.fadeSec, maxLines: overlays.chat.maxLines, fontSize: overlays.chat.fontSize, bgOpacity });
   post(wins.media, 'settings', { fadeSec: overlays.media.fadeSec, maxItems: overlays.media.maxItems });
+  const g = overlays.gif;
+  post(wins.gif, 'settings', { src: g.file ? pathToFileURL(g.file).href : '', opacity: g.opacity ?? 1 });
   post(wins.voice, 'settings', { scale: overlays.voice.scale, gap: overlays.voice.gap, showControls: overlays.voice.showControls, bgOpacity });
 }
 
@@ -153,7 +158,9 @@ function applyConfig(cfg) {
 }
 
 function setEditMode(on) {
+  editing = on;
   for (const win of Object.values(wins)) post(win, 'edit-mode', on);
+  layoutAll();
 }
 
 function setInputMode(on) {
@@ -251,7 +258,7 @@ const settingsDeps = {
 };
 
 app.whenReady().then(() => {
-  for (const name of ['chat', 'media', 'voice']) {
+  for (const name of ['gif', 'media', 'chat', 'voice']) {   // 만든 순서대로 쌓임: GIF가 맨 아래
     wins[name] = makeOverlay(path.join(__dirname, '..', 'renderer', `${name}.html`));
   }
 

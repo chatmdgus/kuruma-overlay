@@ -8,6 +8,7 @@ contextBridge.exposeInMainWorld('settingsApi', {
   onConnection: (cb) => ipcRenderer.on('connection', (_e, c) => cb(c)),
   onTunnel: (cb) => ipcRenderer.on('tunnel', (_e, t) => cb(t)),
   pickKey: () => ipcRenderer.invoke('settings:pick-key'),
+  pickGif: () => ipcRenderer.invoke('settings:pick-gif'),
   login: (partial) => ipcRenderer.invoke('settings:login', partial),
   logout: () => ipcRenderer.invoke('settings:logout'),
   update: (action) => ipcRenderer.invoke('settings:update', action),

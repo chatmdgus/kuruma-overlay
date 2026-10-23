@@ -41,6 +41,7 @@ function setupSettings(deps) {
   ipcMain.handle('settings:save', (_e, partial) => {
     const cfg = deps.config.save(partial);
     deps.applyConfig(cfg);
+    cleanGifs(cfg.overlays.gif?.file);
     return cfg;
   });
 
@@ -48,6 +49,25 @@ function setupSettings(deps) {
   ipcMain.handle('settings:login', (_e, partial) => deps.login(partial));
   ipcMain.handle('settings:logout', () => deps.logout());
   ipcMain.handle('settings:update', (_e, action) => deps.update(action));
+
+  // 내 GIF 고르기: 원본을 옮기거나 지워도 계속 보이게 설정 폴더에 복사해 둠
+  ipcMain.handle('settings:pick-gif', async () => {
+    const r = await dialog.showOpenDialog(win, {
+      title: '화면에 띄울 GIF 고르기',
+      filters: [{ name: '이미지', extensions: ['gif', 'png', 'webp', 'apng', 'jpg', 'jpeg'] }],
+      properties: ['openFile'],
+    });
+    if (r.canceled || !r.filePaths[0]) return null;
+    const fs = require('fs');
+    const { app } = require('electron');
+    const src = r.filePaths[0];
+    const dir = path.join(app.getPath('userData'), 'gif');
+    fs.mkdirSync(dir, { recursive: true });
+    const name = path.basename(src);
+    const dst = path.join(dir, `${Date.now()}${path.extname(src).toLowerCase()}`);
+    fs.copyFileSync(src, dst);
+    return { file: dst, name };
+  });
 
   ipcMain.handle('settings:pick-key', async () => {
     const r = await dialog.showOpenDialog(win, {
@@ -57,6 +77,16 @@ function setupSettings(deps) {
     });
     return r.canceled ? null : r.filePaths[0];
   });
+}
+
+// 저장된 GIF 하나만 남기고 예전에 골랐던 파일은 지움
+function cleanGifs(keep) {
+  const fs = require('fs');
+  const { app } = require('electron');
+  const dir = path.join(app.getPath('userData'), 'gif');
+  try {
+    for (const f of fs.readdirSync(dir)) if (path.join(dir, f) !== keep) fs.unlinkSync(path.join(dir, f));
+  } catch {}
 }
 
 function openSettings(deps) {
