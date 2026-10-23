@@ -397,6 +397,20 @@ text.addEventListener('keydown', (e) => {
 
 // 클릭 통과 창이라 입력창 위에 마우스가 있을 때만 클릭을 받음 (입력 중에는 창 전체)
 ui.clickable(inputBox);
+
+// 전체화면 위에서 입력하는 동안은 창이 모니터 전체로 넓어짐 → 채팅 칸을 원래 자리에 두고, 칸 위에서만 마우스를 받음
+let covered = false;
+window.overlay.on('cover', (r) => {
+  covered = !!r;
+  hover = false;
+  if (r) Object.assign(chat.style, { inset: 'auto', left: `${r.x}px`, top: `${r.y}px`, width: `${r.width}px`, height: `${r.height}px` });
+  else for (const k of ['inset', 'left', 'top', 'width', 'height']) chat.style[k] = '';
+});
+document.addEventListener('mousemove', (e) => {
+  if (!typing || !covered) return;
+  const r = chat.getBoundingClientRect();
+  setHover(e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom);
+});
 inputBox.addEventListener('mouseleave', () => { hover = false; });
 
 ui.bindStatus(document.getElementById('status'));

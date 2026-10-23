@@ -15,6 +15,8 @@ function load() {
     const user32 = koffi.load('user32.dll');
     const kernel32 = koffi.load('kernel32.dll');
     const gdi32 = koffi.load('gdi32.dll');
+    const dwmapi = koffi.load('dwmapi.dll');
+    koffi.struct('DWM_THUMBNAIL_PROPERTIES', { dwFlags: 'uint32_t', rcDestination: RECT, rcSource: RECT, opacity: 'uint8_t', fVisible: 'int', fSourceClientAreaOnly: 'int' });
     api = {
       GetForegroundWindow: user32.func('void * __stdcall GetForegroundWindow()'),
       GetWindowThreadProcessId: user32.func('uint32_t __stdcall GetWindowThreadProcessId(void *hWnd, _Out_ uint32_t *lpdwProcessId)'),
@@ -40,6 +42,10 @@ function load() {
       GetRgnBox: gdi32.func('int __stdcall GetRgnBox(void *hrgn, _Out_ RECT *lprc)'),
       CreateRectRgn: gdi32.func('void * __stdcall CreateRectRgn(int x1, int y1, int x2, int y2)'),
       DeleteObject: gdi32.func('bool __stdcall DeleteObject(void *ho)'),
+      DwmRegisterThumbnail: dwmapi.func('long __stdcall DwmRegisterThumbnail(intptr_t hwndDestination, intptr_t hwndSource, _Out_ void **phThumbnailId)'),
+      DwmUpdateThumbnailProperties: dwmapi.func('long __stdcall DwmUpdateThumbnailProperties(void *hThumbnailId, const DWM_THUMBNAIL_PROPERTIES *ptnProperties)'),
+      DwmUnregisterThumbnail: dwmapi.func('long __stdcall DwmUnregisterThumbnail(void *hThumbnailId)'),
+      IsWindowN: user32.func('bool __stdcall IsWindow(intptr_t hWnd)'),
       PostMessageN: user32.func('bool __stdcall PostMessageW(intptr_t hWnd, uint32_t Msg, uintptr_t wParam, intptr_t lParam)'),
       ShowWindow: user32.func('bool __stdcall ShowWindow(void *hWnd, int nCmdShow)'),
       IsWindowVisible: user32.func('bool __stdcall IsWindowVisible(void *hWnd)'),
@@ -214,7 +220,7 @@ function setOpacity(hwndNumber, alpha) {
       return true;
     }
     if (!(ex & WS_EX_LAYERED)) { a.SetWindowLongPtrN(hwndNumber, GWL_EXSTYLE, ex | WS_EX_LAYERED); layered.add(hwndNumber); }
-    return a.SetLayeredWindowAttributesN(hwndNumber, 0, Math.round(Math.max(0.1, alpha) * 255), 2);   // LWA_ALPHA
+    return a.SetLayeredWindowAttributesN(hwndNumber, 0, Math.round(Math.max(0, alpha) * 255), 2);   // LWA_ALPHA
   } catch { return false; }
 }
 
@@ -247,6 +253,48 @@ function clippedTop(hwndNumber) {
   } catch { return -1; } finally { if (rgn) try { a.DeleteObject(rgn); } catch {} }
 }
 
+// DWM 썸네일: 다른 창의 일부(src)를 우리 창(dest)의 한 자리(dst)에 실시간으로 그려 줌 (윈도우 미리보기와 같은 방식)
+// 디스코드처럼 GPU로 그리는 창은 바깥에서 잘라낼 수 없어서 이걸로 위 버튼 줄만 빼고 보여줌
+function thumbOpen(destHwnd, srcHwnd) {
+  const a = load();
+  if (!a) return null;
+  try {
+    const out = [null];
+    return a.DwmRegisterThumbnail(destHwnd, srcHwnd, out) === 0 ? out[0] : null;
+  } catch { return null; }
+}
+function thumbSet(h, dst, src, opacity) {
+  const a = load();
+  if (!a || !h) return false;
+  try {
+    return a.DwmUpdateThumbnailProperties(h, {
+      dwFlags: 0x1 | 0x2 | 0x4 | 0x8 | 0x10,   // 대상·원본 영역, 투명도, 보이기, 창 전체 기준
+      rcDestination: dst, rcSource: src,
+      opacity: Math.round(Math.max(0, Math.min(1, opacity)) * 255), fVisible: 1, fSourceClientAreaOnly: 0,
+    }) === 0;
+  } catch { return false; }
+}
+function thumbClose(h) {
+  const a = load();
+  if (!a || !h) return;
+  try { a.DwmUnregisterThumbnail(h); } catch {}
+}
+const windowAlive = (hwndNumber) => { const a = load(); try { return !!a && a.IsWindowN(hwndNumber); } catch { return false; } };
+
+// 창 위치 (화면 픽셀)
+function windowRect(hwnd) {
+  const a = load();
+  if (!a || !hwnd) return null;
+  try { const r = {}; return a.GetWindowRect(hwnd, r) ? { x: r.left, y: r.top, width: r.right - r.left, height: r.bottom - r.top } : null; } catch { return null; }
+}
+
+// 이 창(포인터)이 전체화면인지
+function windowIsFullscreen(hwnd) {
+  const a = load();
+  if (!a || !hwnd) return false;
+  try { return a.IsWindow(hwnd) && isFullscreen(a, hwnd); } catch { return false; }
+}
+
 // 다른 프로그램 창을 포커스 안 뺏고 최소화
 function minimizeWindow(hwndNumber) {
   const a = load();
@@ -261,4 +309,4 @@ function closeWindow(hwndNumber) {
   try { return a.PostMessageN(hwndNumber, 0x0010, 0, 0); } catch { return false; }   // WM_CLOSE
 }
 
-module.exports = { clippedTop, setOpacity, clipTop, minimizeWindow, closeWindow, hideTaskbarOver, restoreTaskbars, placeWindow, watchForeground, foregroundExe, windowInfo, foregroundWindow, restoreForeground, foregroundIsFullscreen, available: () => !!load() };
+module.exports = { windowRect, thumbOpen, thumbSet, thumbClose, windowAlive, windowIsFullscreen, clippedTop, setOpacity, clipTop, minimizeWindow, closeWindow, hideTaskbarOver, restoreTaskbars, placeWindow, watchForeground, foregroundExe, windowInfo, foregroundWindow, restoreForeground, foregroundIsFullscreen, available: () => !!load() };

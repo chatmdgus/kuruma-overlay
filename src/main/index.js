@@ -12,7 +12,7 @@ const { setupSettings, openSettings, notifySettings } = require('./settings');
 const { createTray } = require('./tray');
 const { startTunnel } = require('./tunnel');
 const { login, describeLoginError } = require('./login');
-const { clippedTop, setOpacity, clipTop, minimizeWindow, closeWindow, hideTaskbarOver, restoreTaskbars, placeWindow, watchForeground, windowInfo, foregroundWindow, restoreForeground, foregroundIsFullscreen } = require('./foreground');
+const { windowRect, thumbOpen, thumbSet, thumbClose, windowAlive, windowIsFullscreen, setOpacity, clipTop, minimizeWindow, closeWindow, hideTaskbarOver, restoreTaskbars, placeWindow, watchForeground, windowInfo, foregroundWindow, restoreForeground, foregroundIsFullscreen } = require('./foreground');
 const { shell, desktopCapturer } = require('electron');
 const { setupUpdater } = require('./updater');
 
@@ -66,11 +66,13 @@ function layoutAll(cfg = config.get()) {
     const noGif = (name === 'gif' && !o.file && !editing)   // GIF 를 아직 안 골랐으면 숨김 (배치 중엔 자리 표시)
       || (name === 'mirror' && !mirrorShown(cfg) && !editing);   // 비출 창(또는 닫기 버튼 놓을 팝업)이 없으면 숨김
     if (!o.enabled || userHidden || hideForDiscord || noGif || name === 'voice') { win.hide(); continue; }
+    if (name === 'chat' && covering) continue;   // 입력 중 모니터 전체로 넓혀 둔 동안은 그대로
     const d = resolveDisplay(o.monitor, cfg);
     const tall = d.bounds.height > d.bounds.width;
     placeOverlay(win, d, tall ? (o.rectTall || config.DEFAULTS.overlays[name].rectTall) : o.rect);
     win.showInactive();
   }
+  syncThumbsWin();
   chatOnTop();
 }
 
@@ -176,17 +178,12 @@ let arrangeKey = '';
 let lastPicked = [];
 const hwndOf = (w) => Number(String(w.id).split(':')[1]);
 let closers = [];          // 칸에 놓은 팝업마다 닫기 버튼 위치 (mirror 창 기준)
-const styled = new Set();  // 위 줄을 자르거나 투명하게 만든 팝업 (되돌릴 때 씀)
-const clipWant = new Map(); // 팝업 → 잘라야 할 위쪽 픽셀
-// 디스코드(크로미움)는 창 크기·상태가 바뀔 때 잘라낸 영역을 지워버림 → 지워졌으면 다시 자름
-function keepClipped() {
-  if (popupsDown) return;
-  for (const [id, top] of clipWant) {
-    if (!top || !styled.has(id)) continue;
-    const n = hwndOf({ id });
-    if (Number.isFinite(n) && clippedTop(n) === 0) clipTop(n, top);
-  }
-}
+const styled = new Set();  // 투명하게 만든 팝업 (되돌릴 때 씀)
+// 위 버튼 줄 숨기기: 팝업 창은 투명하게 두고(클릭은 그대로 받음), 버튼 줄을 뺀 화면만
+// thumbs 창에 DWM 썸네일로 칸에 딱 맞게 그림. 썸네일은 윈도우가 직접 합성해서 가볍고 끊김 없음
+let thumbsWin = null;
+const thumbs = new Map();  // 팝업 id → 썸네일 핸들
+const nativeId = (win) => { const b = win.getNativeWindowHandle(); return Number(b.length >= 8 ? b.readBigUInt64LE(0) : b.readUInt32LE(0)); };
 function setClosers(list) {
   const was = closers.length > 0;
   closers = list;
@@ -198,10 +195,25 @@ function unstyle(keepIds = []) {
   for (const id of [...styled]) {
     if (keepIds.includes(id)) continue;
     const n = hwndOf({ id });
-    if (Number.isFinite(n)) { clipTop(n, 0); setOpacity(n, 1); }
+    thumbClose(thumbs.get(id));
+    thumbs.delete(id);
+    if (Number.isFinite(n) && windowAlive(n)) { clipTop(n, 0); setOpacity(n, 1); }
     styled.delete(id);
-    clipWant.delete(id);
   }
+  syncThumbsWin();
+}
+// 썸네일 창은 방송 화면 창이 보일 때만 (디스코드가 맨 앞일 때·숨기기 등은 같이 숨김)
+function syncThumbsWin() {
+  if (!thumbsWin || thumbsWin.isDestroyed()) return;
+  const m = wins.mirror;
+  const show = thumbs.size > 0 && !popupsDown && m && !m.isDestroyed() && m.isVisible();
+  if (show) { thumbsWin.setBounds(m.getBounds()); if (!thumbsWin.isVisible()) thumbsWin.showInactive(); }
+  else if (thumbsWin.isVisible()) thumbsWin.hide();
+}
+function overlaysOnTop() {
+  if (thumbsWin && !thumbsWin.isDestroyed() && thumbsWin.isVisible()) thumbsWin.moveTop();
+  if (wins.mirror && !wins.mirror.isDestroyed() && wins.mirror.isVisible()) wins.mirror.moveTop();   // 닫기 버튼이 맨 위
+  chatOnTop();
 }
 
 function arrangeWindows(list, cfg = config.get(), force = false) {
@@ -210,7 +222,7 @@ function arrangeWindows(list, cfg = config.get(), force = false) {
   const tall = d.bounds.height > d.bounds.width;
   const r = tall ? (o.rectTall || config.DEFAULTS.overlays.mirror.rectTall) : o.rect;
   const area = { x: d.bounds.x + r.x * d.bounds.width, y: d.bounds.y + r.y * d.bounds.height, width: r.w * d.bounds.width, height: r.h * d.bounds.height };
-  const T = o.titleBar ?? 22;          // 팝업 위쪽 버튼 줄 높이 (DIP). 칸 위로 밀어 올리고 잘라서 안 보이게
+  const T = o.titleBar ?? 22;          // 팝업 위쪽 버튼 줄 높이 (DIP). 칸 위로 밀어 올리고 그 줄은 안 보이게
   const op = o.opacity ?? 1;
   const key = JSON.stringify([list.map((w) => w.id), area, T, op]);
   unstyle(list.map((w) => w.id));
@@ -218,24 +230,34 @@ function arrangeWindows(list, cfg = config.get(), force = false) {
   if (key === arrangeKey && !force) return;
   arrangeKey = key;
   const cells = gridCells(list.length, area, 6);
+  const ox = Math.round(area.x), oy = Math.round(area.y);
+  setClosers(list.map((w, i) => ({ id: w.id, x: cells[i].x - ox, y: cells[i].y - oy, width: cells[i].width, height: cells[i].height })));
+  // 썸네일 창 = 방송 화면 창과 같은 자리
+  const useThumb = T > 0 && thumbsWin && !thumbsWin.isDestroyed();
+  if (useThumb) { thumbsWin.setBounds({ x: ox, y: oy, width: Math.max(80, Math.round(area.width)), height: Math.max(60, Math.round(area.height)) }); }
+  const origin = useThumb ? screen.dipToScreenRect(null, thumbsWin.getBounds()) : null;
   list.forEach((w, i) => {
     const n = hwndOf(w);
     if (!Number.isFinite(n)) return;
     const c = cells[i];
-    const dip = { x: c.x, y: c.y - T, width: c.width, height: c.height + T };
+    const dip = { x: c.x, y: c.y - T, width: c.width, height: c.height + T };   // 버튼 줄은 칸 위로, 화면은 칸에 딱
     const px = screen.dipToScreenRect(null, dip);   // 디스플레이 배율 → 실제 화면 픽셀
     placeWindow(n, px, true);
-    const tpx = T ? Math.round(T * px.height / dip.height) : 0;
-    setOpacity(n, op);   // 스타일을 바꾸면 디스코드가 영역을 지울 수 있어서 자르기보다 먼저
-    clipTop(n, tpx);
-    clipWant.set(w.id, tpx);
     styled.add(w.id);
+    if (!useThumb && thumbs.has(w.id)) { thumbClose(thumbs.get(w.id)); thumbs.delete(w.id); }
+    let h = useThumb ? thumbs.get(w.id) : null;
+    if (useThumb && !h) { h = thumbOpen(nativeId(thumbsWin), n); if (h) thumbs.set(w.id, h); }
+    if (h) {
+      const tpx = Math.round(T * px.height / dip.height);
+      const cpx = screen.dipToScreenRect(null, c);
+      const dst = { left: cpx.x - origin.x, top: cpx.y - origin.y, right: cpx.x - origin.x + cpx.width, bottom: cpx.y - origin.y + cpx.height };
+      if (thumbSet(h, dst, { left: 0, top: tpx, right: px.width, bottom: px.height }, op)) { setOpacity(n, 1 / 255); return; }   // 거의 투명 (클릭은 팝업이 그대로 받음)
+      thumbClose(h); thumbs.delete(w.id);
+    }
+    setOpacity(n, op);   // 썸네일을 못 쓰면 팝업 자체를 보여줌 (버튼 줄도 보임)
   });
-  const ox = Math.round(area.x), oy = Math.round(area.y);
-  setClosers(list.map((w, i) => ({ id: w.id, x: cells[i].x - ox, y: cells[i].y - oy, width: cells[i].width, height: cells[i].height })));
-  if (wins.mirror && !wins.mirror.isDestroyed()) wins.mirror.moveTop();   // 닫기 버튼이 팝업 위에 오게
-  for (const ms of [150, 600, 1500]) setTimeout(keepClipped, ms);   // 크기를 바꾼 직후 디스코드가 영역을 지우는 경우
-  chatOnTop();
+  syncThumbsWin();
+  overlaysOnTop();
 }
 
 // 16:9 방송이 가장 크게 들어가는 칸 나누기. 창은 칸을 꽉 채우지 않고 영상 비율에 딱 맞춰서
@@ -414,8 +436,33 @@ function startTyping() {
   if (!chat.isFocused()) prevForeground = foregroundWindow();
   chat.setFocusable(true);
   chat.setIgnoreMouseEvents(false);   // 입력 중에는 창 전체로 휠 스크롤·링크 클릭
-  hideTaskbarOver(prevForeground);    // 전체화면 위에서 치면 작업 표시줄이 튀어나오지 않게
+  coverMonitor();                     // 전체화면 위에서 치면 작업 표시줄이 튀어나오지 않게
+  hideTaskbarOver(prevForeground);
   chat.focus();
+}
+
+// 윈도우는 맨 앞 창이 모니터를 꽉 채우고 있을 때만 작업 표시줄을 내려 둠
+// → 전체화면(유튜브 등) 위에서 입력하는 동안 투명한 채팅 창을 그 모니터 전체로 넓혀 둠 (글자 위치는 그대로)
+let covering = null;
+function coverMonitor() {
+  const chat = wins.chat;
+  if (covering || !chat || chat.isDestroyed() || !windowIsFullscreen(prevForeground)) return;
+  const orig = chat.getBounds();
+  const disp = screen.getDisplayMatching(orig);
+  const fr = windowRect(prevForeground);
+  if (!fr) return;
+  const fd = screen.getDisplayMatching(screen.screenToDipRect(null, fr));
+  if (fd.id !== disp.id) return;   // 전체화면이 다른 모니터면 넓혀도 소용없음 (작업 표시줄 숨기기만)
+  covering = { orig };
+  post(chat, 'cover', { x: orig.x - disp.bounds.x, y: orig.y - disp.bounds.y, width: orig.width, height: orig.height });
+  chat.setBounds(disp.bounds);
+  chat.setIgnoreMouseEvents(true, { forward: true });   // 채팅 칸 밖은 클릭 통과 (칸 위에서만 받음)
+}
+function uncover() {
+  if (!covering) return;
+  covering = null;
+  post(wins.chat, 'cover', null);
+  layoutAll();
 }
 
 // 전체화면 창이 다시 앞에 온 뒤에 작업 표시줄을 되돌려야 안 깜빡임. 그새 다시 입력 중이면 그대로 둠
@@ -435,6 +482,7 @@ function endTyping() {
   chat.setFocusable(false);   // 평소에는 포커스를 못 가져가게 (다른 프로그램 단축키·작업 표시줄 문제 방지)
   if (hadFocus && !restoreForeground(prevForeground)) chat.blur();
   prevForeground = null;
+  uncover();
   restoreTaskbarsLater();
 }
 
@@ -565,11 +613,12 @@ app.whenReady().then(() => {
   for (const name of ['gif', 'mirror', 'media', 'chat', 'voice']) {   // 만든 순서대로 쌓임: GIF가 맨 아래
     wins[name] = makeOverlay(path.join(__dirname, '..', 'renderer', `${name}.html`));
   }
+  thumbsWin = makeOverlay(path.join(__dirname, '..', 'renderer', 'thumbs.html'));   // 방송 팝업 썸네일 (버튼 줄 뺀 화면)
 
   // 게임 쪽을 누르면 입력창에서 빠져나옴 → 다시 클릭 통과
   wins.chat.on('blur', () => { if (!wins.chat.isDestroyed()) { wins.chat.setIgnoreMouseEvents(true, { forward: true }); wins.chat.setFocusable(false); } });
-  wins.chat.on('focus', () => hideTaskbarOver(prevForeground));   // 마우스로 입력창을 눌렀을 때도
-  wins.chat.on('blur', restoreTaskbarsLater);
+  wins.chat.on('focus', () => { coverMonitor(); hideTaskbarOver(prevForeground); });   // 마우스로 입력창을 눌렀을 때도
+  wins.chat.on('blur', () => { uncover(); restoreTaskbarsLater(); });
 
   Promise.all(Object.values(wins).map((w) => new Promise((r) => w.webContents.once('did-finish-load', r)))).then(() => {
     sendSettings();
@@ -617,12 +666,10 @@ app.whenReady().then(() => {
   setInterval(() => syncMirror(), 3000);
   // 팝업을 누르면 팝업이 맨 위로 올라와서 닫기 버튼을 덮음 → 1초마다 버튼 창을 다시 위로
   setInterval(() => {
-    keepClipped();
     const m = wins.mirror;
     if (!closers.length || popupsDown || !m || m.isDestroyed() || !m.isVisible()) return;
     if (foregroundIsFullscreen(ownHandles())) return;
-    m.moveTop();
-    chatOnTop();
+    overlaysOnTop();
   }, 1000);
 
   trayApi = createTray({
@@ -682,7 +729,7 @@ app.whenReady().then(() => {
   // 채팅 말풍선 위에 마우스가 있는 동안만 휠을 받음 (포커스는 안 가져감 → 게임·작업 표시줄 그대로)
   ipcMain.on('set-hover', (e, on) => {
     const win = BrowserWindow.fromWebContents(e.sender);
-    if (!win || win !== wins.chat || win.isFocused()) return;
+    if (!win || win !== wins.chat || (win.isFocused() && !covering)) return;
     win.setIgnoreMouseEvents(!on, { forward: true });
   });
   // 채팅 글 속 링크: http/https 만 브라우저로
@@ -696,7 +743,7 @@ app.whenReady().then(() => {
 app.on('second-instance', () => openSettings(settingsDeps));
 
 app.on('before-quit', () => { quitting = true; });
-process.on('exit', () => { try { restoreTaskbars(); } catch {} });   // 숨긴 작업 표시줄은 무슨 일이 있어도 되돌림
+process.on('exit', () => { try { restoreTaskbars(); } catch {} try { unstyle(); } catch {} });   // 숨긴 작업 표시줄·투명하게 만든 팝업은 무슨 일이 있어도 되돌림   // 숨긴 작업 표시줄은 무슨 일이 있어도 되돌림
 
 app.on('will-quit', () => {
   unstyle();   // 팝업 투명도·잘라낸 위 줄 되돌리기
