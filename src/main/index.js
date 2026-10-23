@@ -219,9 +219,11 @@ function emit(type, payload) {
       post(wins.chat, 'message', {
         id: payload.id,
         author: payload.author,
-        text: payload.content || (media.length ? (media[0].kind === 'video' ? '영상을 보냄' : '사진을 보냄') : ''),
+        text: payload.content
+          || (payload.stickers?.length ? `스티커 · ${payload.stickers.join(', ')}` : '')
+          || (media.length ? (media[0].kind === 'video' ? '영상을 보냄' : '사진을 보냄') : ''),
         channel: channelNames.get(payload.channelId) || null,
-        mediaOnly: !payload.content && media.length > 0,
+        mediaOnly: !payload.content && (media.length > 0 || payload.stickers?.length > 0),
       });
       for (const m of media) post(wins.media, 'media', m);
       // 채널을 따로 정하지 않았으면 마지막으로 글이 올라온 채널로 보냄 (입력 중에는 안 바꿈)
