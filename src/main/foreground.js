@@ -46,6 +46,11 @@ function load() {
       DwmUpdateThumbnailProperties: dwmapi.func('long __stdcall DwmUpdateThumbnailProperties(void *hThumbnailId, const DWM_THUMBNAIL_PROPERTIES *ptnProperties)'),
       DwmUnregisterThumbnail: dwmapi.func('long __stdcall DwmUnregisterThumbnail(void *hThumbnailId)'),
       IsWindowN: user32.func('bool __stdcall IsWindow(intptr_t hWnd)'),
+      GetTopWindow: user32.func('void * __stdcall GetTopWindow(void *hWnd)'),
+      GetWindow: user32.func('void * __stdcall GetWindow(void *hWnd, uint32_t uCmd)'),
+      IsIconic: user32.func('bool __stdcall IsIconic(void *hWnd)'),
+      GetWindowLongPtrV: user32.func('intptr_t __stdcall GetWindowLongPtrW(void *hWnd, int nIndex)'),
+      DwmGetWindowAttribute: dwmapi.func('long __stdcall DwmGetWindowAttribute(void *hwnd, uint32_t dwAttribute, _Out_ int *pvAttribute, uint32_t cbAttribute)'),
       PostMessageN: user32.func('bool __stdcall PostMessageW(intptr_t hWnd, uint32_t Msg, uintptr_t wParam, intptr_t lParam)'),
       ShowWindow: user32.func('bool __stdcall ShowWindow(void *hWnd, int nCmdShow)'),
       IsWindowVisible: user32.func('bool __stdcall IsWindowVisible(void *hWnd)'),
@@ -281,6 +286,37 @@ function thumbClose(h) {
 }
 const windowAlive = (hwndNumber) => { const a = load(); try { return !!a && a.IsWindowN(hwndNumber); } catch { return false; } };
 
+// 이 모니터(mon, 화면 픽셀)를 꽉 채운 채 가장 앞에 있는 창 (유튜브 전체화면 등). 없으면 null
+// 맨 앞 창이 아니어도 됨: 게임은 다른 모니터에서 하고, 유튜브는 이 모니터에서 전체화면인 경우
+// skip(창 주소): 건너뛸 창 (칸에 배치한 방송 팝업 등). 우리 앱 창·클릭 통과 창·숨은 창은 자동으로 건너뜀
+function fullscreenOn(mon, skip = () => false) {
+  const a = load();
+  if (!a) return null;
+  try {
+    let h = a.GetTopWindow(null);
+    for (let i = 0; h && i < 500; i++, h = a.GetWindow(h, 2)) {   // GW_HWNDNEXT: 앞에서부터 차례로
+      if (!a.IsWindowVisible(h) || a.IsIconic(h)) continue;
+      const pid = [0];
+      a.GetWindowThreadProcessId(h, pid);
+      if (pid[0] === process.pid || skip(koffiAddress(h))) continue;
+      const cloaked = [0];
+      try { a.DwmGetWindowAttribute(h, 14, cloaked, 4); } catch {}   // DWMWA_CLOAKED: 다른 가상 데스크톱 등
+      if (cloaked[0]) continue;
+      const ex = Number(a.GetWindowLongPtrV(h, -20));
+      if (ex & 0x20) continue;   // WS_EX_TRANSPARENT: 다른 앱의 클릭 통과 오버레이
+      const r = {};
+      if (!a.GetWindowRect(h, r)) continue;
+      const L = mon.x, T = mon.y, R = mon.x + mon.width, B = mon.y + mon.height;
+      if (r.right <= L || r.left >= R || r.bottom <= T || r.top >= B) continue;   // 이 모니터에 없음
+      if (r.left <= L && r.top <= T && r.right >= R && r.bottom >= B) return h;
+      if (ex & 0x80) continue;   // WS_EX_TOOLWINDOW: 작은 떠 있는 창 (작업 표시줄 등)
+      const w = Math.min(r.right, R) - Math.max(r.left, L), hh = Math.min(r.bottom, B) - Math.max(r.top, T);
+      if (w * hh > mon.width * mon.height * 0.5) return null;   // 보통 창이 앞을 크게 가리고 있음 → 전체화면 아님
+    }
+  } catch {}
+  return null;
+}
+
 // 창 위치 (화면 픽셀)
 function windowRect(hwnd) {
   const a = load();
@@ -309,4 +345,4 @@ function closeWindow(hwndNumber) {
   try { return a.PostMessageN(hwndNumber, 0x0010, 0, 0); } catch { return false; }   // WM_CLOSE
 }
 
-module.exports = { windowRect, thumbOpen, thumbSet, thumbClose, windowAlive, windowIsFullscreen, clippedTop, setOpacity, clipTop, minimizeWindow, closeWindow, hideTaskbarOver, restoreTaskbars, placeWindow, watchForeground, foregroundExe, windowInfo, foregroundWindow, restoreForeground, foregroundIsFullscreen, available: () => !!load() };
+module.exports = { fullscreenOn, windowRect, thumbOpen, thumbSet, thumbClose, windowAlive, windowIsFullscreen, clippedTop, setOpacity, clipTop, minimizeWindow, closeWindow, hideTaskbarOver, restoreTaskbars, placeWindow, watchForeground, foregroundExe, windowInfo, foregroundWindow, restoreForeground, foregroundIsFullscreen, available: () => !!load() };
