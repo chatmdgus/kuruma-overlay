@@ -247,6 +247,7 @@ function fillMain() {
   bindSeg('bg-opacity', [{ label: '없음', value: 0 }, { label: '연하게', value: 0.3 }, { label: '보통', value: 0.5 }, { label: '진하게', value: 0.72 }],
     () => state.appearance.bgOpacity, (v) => { state.appearance.bgOpacity = v; });
   bindSeg('hide-discord', ONOFF, () => state.appearance.hideOnDiscord !== false, (v) => { state.appearance.hideOnDiscord = v; }, { live: false });
+  bindSeg('hide-capture', ONOFF, () => state.appearance.hideFromCapture !== false, (v) => { state.appearance.hideFromCapture = v; });
   bindSeg('at-login', ONOFF, () => !!state.launch.atLogin, (v) => { state.launch.atLogin = v; }, { live: false });
 }
 

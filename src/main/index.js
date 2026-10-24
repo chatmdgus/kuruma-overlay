@@ -84,10 +84,19 @@ function restack() {
   for (const w of stackOrder()) if (w.isVisible()) w.moveTop();
 }
 
+// 화면 공유·녹화에 오버레이가 안 찍히게 (디스코드 방송을 켜도 친구들 화면·내 미리보기에 채팅이 안 나옴)
+function protectAll(cfg) {
+  const on = cfg.appearance.hideFromCapture !== false;
+  for (const w of [wins.chat, wins.media, wins.gif, wins.mirror, thumbsWin]) {
+    if (!w || w.isDestroyed() || w._protected === on) continue;
+    try { w.setContentProtection(on); w._protected = on; } catch {}
+  }
+}
 let lastLayoutCfg = null;   // 설정 창 미리보기 중이면 저장 안 한 설정 (새로 만든 창이 열렸을 때 이걸로 다시 배치)
 function layoutAll(cfg = config.get()) {
   if (quitting) return;
   lastLayoutCfg = cfg;
+  protectAll(cfg);
   for (const name of ['gif', 'mirror', 'media', 'chat']) {   // 음성 오버레이는 안 씀 (창도 안 만듦)
     const o = cfg.overlays[name];
     // GIF·방송 화면 창은 켜 둘 때만 만들고, 끄면 없애서 메모리를 아낌
@@ -289,7 +298,7 @@ function arrangeWindows(list, cfg = config.get(), force = false) {
   const ox = Math.round(area.x), oy = Math.round(area.y);
   setClosers(list.map((w, i) => ({ id: w.id, x: cells[i].x - ox, y: cells[i].y - oy, width: cells[i].width, height: cells[i].height })));
   // 썸네일 창 = 방송 화면 창과 같은 자리
-  if (T > 0 && (!thumbsWin || thumbsWin.isDestroyed())) thumbsWin = makeOverlay(path.join(__dirname, '..', 'renderer', 'thumbs.html'));   // 팝업이 있을 때만 만듦
+  if (T > 0 && (!thumbsWin || thumbsWin.isDestroyed())) { thumbsWin = makeOverlay(path.join(__dirname, '..', 'renderer', 'thumbs.html')); protectAll(cfg); }   // 팝업이 있을 때만 만듦
   const useThumb = T > 0 && thumbsWin && !thumbsWin.isDestroyed();
   if (useThumb) { thumbsWin.setBounds({ x: ox, y: oy, width: Math.max(80, Math.round(area.width)), height: Math.max(60, Math.round(area.height)) }); }
   const origin = useThumb ? screen.dipToScreenRect(null, thumbsWin.getBounds()) : null;
@@ -703,6 +712,8 @@ app.whenReady().then(() => {
   }, 100);
   // 팝업을 누르면 팝업이 맨 위로 올라와서 닫기 버튼을 덮음 → 1초마다 버튼 창을 다시 위로
   setInterval(() => {
+    // 디스코드가 맨 앞인데 오버레이가 보이고 있으면 (다른 경로로 다시 켜진 경우) 다시 숨김
+    if (discordFront && config.get().appearance.hideOnDiscord && [wins.chat, wins.media, wins.gif, wins.mirror, thumbsWin].some((w) => w && !w.isDestroyed() && w.isVisible())) layoutAll();
     const m = wins.mirror;
     if (!closers.length || popupsDown || !m || m.isDestroyed() || !m.isVisible()) return;
     if (foregroundIsFullscreen(ownHandles())) return;
