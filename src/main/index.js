@@ -421,9 +421,14 @@ function syncTunnel(cfg = config.get()) {
 // 서버 주소를 비워두면: SSH 터널을 쓰면 터널, 아니면 공개 서버
 const serverUrlOf = (cfg) => cfg.serverUrl || (cfg.ssh.enabled ? `ws://127.0.0.1:${cfg.ssh.localPort}` : config.PUBLIC_SERVER);
 
+// Windows 시작 프로그램 등록 (레지스트리 Run 값). 값 이름은 앱 ID로 고정
+// v0.7.19 전에는 이름이 달랐어서(electron.app.…) 끄기를 해도 예전 값이 남아 계속 켜졌음 → 예전 이름들도 같이 지움
+const LOGIN_NAME = 'dev.kuruma.overlay';
+const OLD_LOGIN_NAMES = ['electron.app.Kuruma Overlay', 'electron.app.kuruma-overlay', 'Kuruma Overlay', 'kuruma-overlay'];
 function syncLaunch(cfg = config.get()) {
-  // 개발 실행일 때는 electron.exe에 앱 폴더를 넘겨야 함
-  app.setLoginItemSettings({ openAtLogin: !!cfg.launch.atLogin, path: process.execPath, args: app.isPackaged ? [] : [app.getAppPath()] });
+  const base = { path: process.execPath, args: app.isPackaged ? [] : [app.getAppPath()] };   // 개발 실행일 때는 electron.exe에 앱 폴더를 넘김
+  for (const name of OLD_LOGIN_NAMES) { try { app.setLoginItemSettings({ ...base, openAtLogin: false, name }); } catch {} }
+  try { app.setLoginItemSettings({ ...base, openAtLogin: !!cfg.launch.atLogin, name: LOGIN_NAME }); } catch {}
 }
 
 // 세션 키는 Windows 사용자 계정으로 암호화해서 저장
@@ -655,7 +660,7 @@ app.whenReady().then(() => {
     sendSettings();
     setInputOn(config.get().overlays.chat.inputOn !== false, { save: false });
     syncTunnel();
-    if (config.get().launch.atLogin) syncLaunch();   // 설치 위치가 바뀌었을 수 있어서 다시 등록
+    syncLaunch();   // 켤 때마다 설정대로 다시 맞춤 (설치 위치가 바뀌었거나 예전 이름으로 남은 등록 지우기)
     startFeed();
     const cfg = config.get();
     // 첫 실행이거나 접속 정보가 없으면 설정 창부터
