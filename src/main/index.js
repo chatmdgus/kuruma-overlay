@@ -429,6 +429,29 @@ function syncLaunch(cfg = config.get()) {
   const base = { path: process.execPath, args: app.isPackaged ? [] : [app.getAppPath()] };   // 개발 실행일 때는 electron.exe에 앱 폴더를 넘김
   for (const name of OLD_LOGIN_NAMES) { try { app.setLoginItemSettings({ ...base, openAtLogin: false, name }); } catch {} }
   try { app.setLoginItemSettings({ ...base, openAtLogin: !!cfg.launch.atLogin, name: LOGIN_NAME }); } catch {}
+  if (process.platform === 'win32' && app.isPackaged) cleanRunEntries(!!cfg.launch.atLogin);
+}
+
+// 이름이 뭐든(electron.app.Electron 같은 것도) 이 exe를 켜는 Run 값은 지움. 자동 실행이 켜져 있으면 LOGIN_NAME 하나만 남김
+const RUN_KEY = 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run';
+const APPROVED_KEY = 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\StartupApproved\\Run';
+function cleanRunEntries(keepMine) {
+  const { execFile } = require('child_process');
+  const exe = process.execPath.toLowerCase();
+  const exeName = path.basename(exe);
+  execFile('reg', ['query', RUN_KEY], { windowsHide: true }, (err, out) => {
+    if (err || !out) return;
+    for (const line of out.split(/\r?\n/)) {
+      const m = line.match(/^ {4}(.+?) {4}REG_\w+ {4}(.*)$/);
+      if (!m) continue;
+      const [, name, data] = m;
+      const d = data.toLowerCase();
+      if (!d.includes(exe) && !d.includes(`\\${exeName}`)) continue;
+      if (keepMine && name === LOGIN_NAME) continue;
+      execFile('reg', ['delete', RUN_KEY, '/v', name, '/f'], { windowsHide: true }, () => {});
+      execFile('reg', ['delete', APPROVED_KEY, '/v', name, '/f'], { windowsHide: true }, () => {});
+    }
+  });
 }
 
 // 세션 키는 Windows 사용자 계정으로 암호화해서 저장
